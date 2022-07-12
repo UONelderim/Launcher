@@ -1,0 +1,13 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="150"
+        x:Class="NelderimLauncher.Views.UpdateDialog"
+        Title="UpdateDialog">
+    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+        <TextBlock HorizontalAlignment="Center">Updating NelderimPatcher</TextBlock>
+        <TextBlock HorizontalAlignment="Center">Downloading</TextBlock>
+        <ProgressBar Value="50" Margin="5"></ProgressBar>
+    </StackPanel>
+</Window>
