@@ -5,20 +5,30 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="300"
         x:Class="NelderimLauncher.Views.MainWindow"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="NelderimLauncher">
+        Icon="/Assets/nelderim.ico"
+        Title="NelderimLauncher"
+        Width="600" Height="300" Name="MainWindow1">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
-    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-        <TextBlock Text="{Binding Greeting}"/>
-        <!-- <ScrollBar Orientation="Vertical" Visibility="Visible" ViewportSize="50"> -->
-        <ScrollViewer Name="scroll" VerticalScrollBarVisibility="Auto" AllowAutoHide="False" Height="200" MaxHeight="200">
-            <TextBox Name="tb" IsEnabled="false" TextWrapping="Wrap">TestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTest
-            </TextBox>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="5" Text="{Binding PatchUrl}"></TextBox>
+        <Button Grid.Row="0" Grid.Column="2" Margin="5" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding Refresh}">Odśwież</Button>
+        <ScrollViewer Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" AllowAutoHide="False" Margin="5">
+            <TextBox IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding LogText}" CaretIndex="{Binding LogCaretIndex}" MaxWidth="{Binding #MainWindow1.Width}"/>
         </ScrollViewer>
-        <!-- </ScrollBar> -->
-        <Button Click="Button_OnClick">Click me</Button>
-    </StackPanel>
+        <ProgressBar Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="5" VerticalAlignment="Stretch" Value="{Binding ProgressValue}"/>
+        <Button Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="5" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding Patch}" IsEnabled="{Binding PatchButtonActive}" Content="{Binding PatchButtonContent}"/>
+    </Grid>
 </Window>
