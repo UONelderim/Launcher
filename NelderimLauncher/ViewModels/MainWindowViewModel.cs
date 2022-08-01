@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net.Http;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia.Threading;
+using Microsoft.VisualBasic;
 using NelderimLauncher.Models;
+using NelderimLauncher.Utility;
 using ReactiveUI;
 
 namespace NelderimLauncher.ViewModels
@@ -20,13 +22,14 @@ namespace NelderimLauncher.ViewModels
         private List<PatchInfo> _patchInfos = new();
         private float _progressValue;
 
-        private static readonly HttpClient HttpClient = new();
-
-        public MainWindowViewModel()
+        public MainWindowViewModel(string[] desktopArgs)
         {
-            _patchUrl = Config.Get(Config.Key.PatchUrl, "https://nelderim.pl/patch");
+            LogToConsole(Strings.Join(desktopArgs, " "));
+            _patchUrl = Config.Get(Config.Key.PatchUrl);
         }
 
+        public string Title => $"Nelderim Launcher {Assembly.GetEntryAssembly().GetName().Version}";
+        
         public string LogText
         {
             get => _logText;
@@ -75,7 +78,7 @@ namespace NelderimLauncher.ViewModels
         {
             try
             {
-                var async = await HttpClient.GetAsync($"{_patchUrl}/NelderimPatch.json");
+                var async = await Utils.HttpClient.GetAsync($"{_patchUrl}/NelderimPatch.json");
                 string responseBody = await async.Content.ReadAsStringAsync();
                 List<Patch>? patches = JsonSerializer.Deserialize<List<Patch>>(responseBody);
                 _patchInfos = patches.ConvertAll(patch => new PatchInfo(patch)).FindAll(info => info.ShouldUpdate);
@@ -120,7 +123,7 @@ namespace NelderimLauncher.ViewModels
                     progress.ProgressChanged += OnProgressOnProgressChanged;
                     using (var file = new FileStream(Path.GetFullPath(info.Filename), FileMode.OpenOrCreate))
                     {
-                        await HttpClient.DownloadDataAsync($"{_patchUrl}/{info.Filename}", file, progress);
+                        await Utils.HttpClient.DownloadDataAsync($"{_patchUrl}/{info.Filename}", file, progress);
                     }
 
                     progress.ProgressChanged -= OnProgressOnProgressChanged;

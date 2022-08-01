@@ -6,8 +6,9 @@
         mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="300"
         x:Class="NelderimLauncher.Views.MainWindow"
         Icon="/Assets/nelderim.ico"
-        Title="NelderimLauncher"
-        Width="600" Height="300" Name="MainWindow1">
+        Title="{Binding Title}"
+        Width="600" Height="300" Name="MainWindow1"
+        WindowStartupLocation="CenterScreen">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>

@@ -6,7 +6,7 @@ using NelderimLauncher.Views;
 
 namespace NelderimLauncher
 {
-    public partial class App : Application
+    public class App : Application
     {
         public override void Initialize()
         {
@@ -17,12 +17,24 @@ namespace NelderimLauncher
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                desktop.MainWindow = new MainWindow
+                if (desktop.Args.Length == 2 && desktop.Args[0] == "update")
                 {
-                    DataContext = new MainWindowViewModel(),
-                };
+                    var model = new UpdateWindowViewModel(desktop.Args);
+                    desktop.MainWindow = new UpdateWindow
+                    {
+                        DataContext = model
+                    };
+                    model.OnUpdateFinished += (s, e) => desktop.MainWindow.Close();
+                }
+                else
+                {
+                    desktop.MainWindow = new MainWindow
+                    {
+                        DataContext = new MainWindowViewModel(desktop.Args)
+                    };
+                }
             }
-
+            
             base.OnFrameworkInitializationCompleted();
         }
     }
