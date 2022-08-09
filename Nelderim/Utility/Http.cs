@@ -1,34 +1,8 @@
-﻿using System;
-using System.IO;
-using System.Net.Http;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Avalonia;
-using Avalonia.Platform;
+﻿namespace Nelderim.Utility;
 
-namespace NelderimLauncher.Utility;
-
-public static class Utils
+public static class Http
 {
     public static readonly HttpClient HttpClient = new();
-
-    public static string Sha1Hash(Stream stream)
-    {
-        using (SHA1 sha1 = SHA1.Create())
-        {
-            byte[] hash = sha1.ComputeHash(stream);
-            StringBuilder sb = new StringBuilder(hash.Length * 2);
-
-            foreach (byte b in hash)
-            {
-                sb.Append(b.ToString("X2"));
-            }
-
-            return sb.ToString();
-        }
-    }
 
     public static async Task DownloadDataAsync(this HttpClient client, string requestUrl, Stream destination,
         IProgress<float>? progress = null, CancellationToken cancellationToken = default)
@@ -54,7 +28,7 @@ public static class Utils
     }
 
     static async Task CopyToAsync(this Stream source, Stream destination, int bufferSize,
-        IProgress<long> progress = null, CancellationToken cancellationToken = default)
+        IProgress<long>? progress = null, CancellationToken cancellationToken = default)
     {
         if (bufferSize < 0)
             throw new ArgumentOutOfRangeException(nameof(bufferSize));
@@ -77,11 +51,5 @@ public static class Utils
             totalBytesRead += bytesRead;
             progress?.Report(totalBytesRead);
         }
-    }
-
-    public static Stream GetAsset(string name)
-    {
-        return AvaloniaLocator.Current.GetService<IAssetLoader>()
-            .Open(new Uri($"avares://NelderimLauncher/Assets/{name}"));
     }
 }

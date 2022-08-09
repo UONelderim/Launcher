@@ -4,7 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using MessageBox.Avalonia.DTO;
 using MessageBox.Avalonia.Models;
-using NelderimLauncher.Utility;
+using Nelderim.Utility;
 using static MessageBox.Avalonia.Enums.Icon;
 using static MessageBox.Avalonia.MessageBoxManager;
 
@@ -15,13 +15,23 @@ namespace NelderimLauncher.Views
         public MainWindow()
         {
             InitializeComponent();
-            if (Updater.shouldSelfUpdate())
+            if (ShouldSelfUpdate())
             {
-                Dispatcher.UIThread.Post(() => UpdateCheck(), DispatcherPriority.Background);
+                Dispatcher.UIThread.Post(() => ShowUpdateDialog(), DispatcherPriority.Background);
+            }
+        }
+        
+        public static bool ShouldSelfUpdate()
+        {
+            var patch = Utils.FetchPatch();
+        
+            using (FileStream stream = File.OpenRead(Utils.AppName()))
+            {
+                return Crypto.Sha1Hash(stream) != patch.Sha1;
             }
         }
 
-        private async void UpdateCheck()
+        private async void ShowUpdateDialog()
         {
             var buttonResult = await GetMessageBoxCustomWindow(new MessageBoxCustomParams
             {
@@ -40,7 +50,7 @@ namespace NelderimLauncher.Views
             }).ShowDialog(this);
             if ("Tak".Equals(buttonResult))
             {
-                var nelderimApp = Updater.AppName();
+                var nelderimApp = Utils.AppName();
                 var appCopyName = $"_{nelderimApp}";
                 File.Copy(nelderimApp, appCopyName, true);
             

@@ -2,12 +2,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:viewModels="clr-namespace:NelderimLauncher.ViewModels"
         mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="300"
         x:Class="NelderimLauncher.Views.MainWindow"
         Icon="/Assets/nelderim.ico"
         Title="{Binding Title}"
         Width="600" Height="300" Name="MainWindow1"
         WindowStartupLocation="CenterScreen">
+    <Design.DataContext>
+        <viewModels:MainWindowViewModel/>
+    </Design.DataContext>
     
     <Grid>
         <Grid.ColumnDefinitions>

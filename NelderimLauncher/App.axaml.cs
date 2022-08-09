@@ -34,7 +34,7 @@ namespace NelderimLauncher
                     };
                 }
             }
-            
+
             base.OnFrameworkInitializationCompleted();
         }
     }

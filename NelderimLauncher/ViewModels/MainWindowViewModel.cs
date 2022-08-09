@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Avalonia.Threading;
 using Microsoft.VisualBasic;
-using NelderimLauncher.Models;
-using NelderimLauncher.Utility;
+using Nelderim.Model;
+using Nelderim.Utility;
 using ReactiveUI;
 
 namespace NelderimLauncher.ViewModels
@@ -29,7 +28,7 @@ namespace NelderimLauncher.ViewModels
         }
 
         public string Title => $"Nelderim Launcher {Assembly.GetEntryAssembly().GetName().Version}";
-        
+
         public string LogText
         {
             get => _logText;
@@ -47,7 +46,7 @@ namespace NelderimLauncher.ViewModels
             get => _patchButtonActive;
             set => this.RaiseAndSetIfChanged(ref _patchButtonActive, value);
         }
-        
+
         public string PatchButtonContent
         {
             get => _patchButtonContent;
@@ -68,17 +67,17 @@ namespace NelderimLauncher.ViewModels
 
         void Refresh()
         {
-            if(Config.Get(Config.Key.PatchUrl) != PatchUrl)
+            if (Config.Get(Config.Key.PatchUrl) != PatchUrl)
                 Config.Set(Config.Key.PatchUrl, PatchUrl);
             PatchButtonActive = true;
             Dispatcher.UIThread.Post(RefreshTask, DispatcherPriority.Background);
         }
-        
+
         private async void RefreshTask()
         {
             try
             {
-                var async = await Utils.HttpClient.GetAsync($"{_patchUrl}/NelderimPatch.json");
+                var async = await Http.HttpClient.GetAsync($"{_patchUrl}/NelderimPatch.json");
                 string responseBody = await async.Content.ReadAsStringAsync();
                 List<Patch>? patches = JsonSerializer.Deserialize<List<Patch>>(responseBody);
                 _patchInfos = patches.ConvertAll(patch => new PatchInfo(patch)).FindAll(info => info.ShouldUpdate);
@@ -91,15 +90,14 @@ namespace NelderimLauncher.ViewModels
                 {
                     LogToConsole("Wszystkie pliki są aktualne");
                 }
-                
             }
             catch (Exception e)
             {
                 LogToConsole(e.ToString());
             }
         }
-        
-        
+
+
         void Patch()
         {
             Dispatcher.UIThread.Post(PatchTask, DispatcherPriority.Background);
@@ -123,13 +121,13 @@ namespace NelderimLauncher.ViewModels
                     progress.ProgressChanged += OnProgressOnProgressChanged;
                     using (var file = new FileStream(Path.GetFullPath(info.Filename), FileMode.OpenOrCreate))
                     {
-                        await Utils.HttpClient.DownloadDataAsync($"{_patchUrl}/{info.Filename}", file, progress);
+                        await Http.HttpClient.DownloadDataAsync($"{_patchUrl}/{info.Filename}", file, progress);
                     }
 
                     progress.ProgressChanged -= OnProgressOnProgressChanged;
                 }
+
                 LogToConsole("Wszystkie pliki są aktualne");
-               
             }
             catch (Exception e)
             {
@@ -143,7 +141,7 @@ namespace NelderimLauncher.ViewModels
                 PatchButtonContent = "Aktualizuj";
             }
         }
-        
+
         void LogToConsole(String text)
         {
             LogText += $"{text}\n";

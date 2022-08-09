@@ -1,14 +1,14 @@
 ﻿using Avalonia;
 using Avalonia.ReactiveUI;
 using System;
-using NelderimLauncher.Utility;
+using Nelderim.Utility;
 
 namespace NelderimLauncher
 {
     class Program
     {
         private static FileLogger log = new(typeof(Program));
-        
+
         [STAThread]
         public static void Main(string[] args)
         {
@@ -17,7 +17,7 @@ namespace NelderimLauncher
                 BuildAvaloniaApp()
                     .StartWithClassicDesktopLifetime(args);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 log.Fatal(e.ToString());
             }

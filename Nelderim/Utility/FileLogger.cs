@@ -1,7 +1,6 @@
-﻿using System;
-using System.Text;
+﻿using System.Text;
 
-namespace NelderimLauncher.Utility;
+namespace Nelderim.Utility;
 
 public class FileLogger
 {
@@ -53,7 +52,8 @@ public class FileLogger
         {
             return;
         }
-        lock (fileLock) 
+
+        lock (fileLock)
         {
             using (System.IO.StreamWriter writer = new System.IO.StreamWriter(logFilename, append, Encoding.UTF8))
             {

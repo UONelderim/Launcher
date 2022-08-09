@@ -4,14 +4,15 @@ using System.IO;
 using Avalonia.Threading;
 using MessageBox.Avalonia;
 using MessageBox.Avalonia.Enums;
-using NelderimLauncher.Utility;
+using Nelderim.Utility;
 using ReactiveUI;
 
-namespace NelderimLauncher.Views;
+namespace NelderimLauncher.ViewModels;
 
 public class UpdateWindowViewModel : ReactiveObject
 {
     private float _progressValue = 0.45f;
+
     public float ProgressValue
     {
         get => _progressValue;
@@ -19,6 +20,7 @@ public class UpdateWindowViewModel : ReactiveObject
     }
 
     private string _updateMessage;
+
     public string UpdateMessage
     {
         get => _updateMessage;
@@ -26,7 +28,7 @@ public class UpdateWindowViewModel : ReactiveObject
     }
 
     public event EventHandler OnUpdateFinished;
-    
+
     public UpdateWindowViewModel(string[] args)
     {
         Dispatcher.UIThread.Post(() => Update(args), DispatcherPriority.Background);
@@ -37,7 +39,7 @@ public class UpdateWindowViewModel : ReactiveObject
         try
         {
             string updateTarget = args[1];
-            var patch = Updater.FetchPatch();
+            var patch = Utils.FetchPatch();
             var progress = new Progress<float>();
             progress.ProgressChanged += (s, f) =>
             {
@@ -46,7 +48,7 @@ public class UpdateWindowViewModel : ReactiveObject
             };
             using (var file = new FileStream(Path.GetFullPath(updateTarget), FileMode.OpenOrCreate))
             {
-                await Utils.DownloadDataAsync(Utils.HttpClient, $"{Config.Get(Config.Key.PatchUrl)}/{patch.File}",
+                await Http.DownloadDataAsync(Http.HttpClient, $"{Config.Get(Config.Key.PatchUrl)}/{patch.File}",
                     file,
                     progress);
             }
@@ -57,9 +59,10 @@ public class UpdateWindowViewModel : ReactiveObject
             process.Start();
             OnUpdateFinished(this, new EventArgs());
         }
-        catch(Exception e)
+        catch (Exception e)
         {
-            MessageBoxManager.GetMessageBoxStandardWindow("Błąd krytyczny", e.ToString(), ButtonEnum.Ok, Icon.Error).Show();
+            await MessageBoxManager
+                .GetMessageBoxStandardWindow("Błąd krytyczny", e.ToString(), ButtonEnum.Ok, Icon.Error).Show();
         }
     }
 }
