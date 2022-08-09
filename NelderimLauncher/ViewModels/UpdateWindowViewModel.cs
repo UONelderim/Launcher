@@ -39,6 +39,7 @@ public class UpdateWindowViewModel : ReactiveObject
         try
         {
             string updateTarget = args[1];
+            string tempUpdateTarget = $"{updateTarget}.temp";
             var patch = Utils.FetchPatch();
             var progress = new Progress<float>();
             progress.ProgressChanged += (s, f) =>
@@ -46,13 +47,14 @@ public class UpdateWindowViewModel : ReactiveObject
                 ProgressValue = f;
                 UpdateMessage = $"{f:0}%";
             };
-            using (var file = new FileStream(Path.GetFullPath(updateTarget), FileMode.OpenOrCreate))
+            using (var file = new FileStream(Path.GetFullPath(tempUpdateTarget), FileMode.OpenOrCreate))
             {
                 await Http.DownloadDataAsync(Http.HttpClient, $"{Config.Get(Config.Key.PatchUrl)}/{patch.File}",
                     file,
                     progress);
             }
 
+            File.Move(tempUpdateTarget, updateTarget, true);
             var process = new Process();
             process.StartInfo.FileName = Path.GetFullPath(updateTarget);
             process.StartInfo.Arguments = "Aktualizacja zakończona pomyślnie";
