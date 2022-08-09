@@ -71,10 +71,10 @@ namespace NelderimLauncher.ViewModels
             if(Config.Get(Config.Key.PatchUrl) != PatchUrl)
                 Config.Set(Config.Key.PatchUrl, PatchUrl);
             PatchButtonActive = true;
-            Dispatcher.UIThread.Post(() => RefreshTask(), DispatcherPriority.Background);
+            Dispatcher.UIThread.Post(RefreshTask, DispatcherPriority.Background);
         }
         
-        private async Task RefreshTask()
+        private async void RefreshTask()
         {
             try
             {
@@ -102,10 +102,10 @@ namespace NelderimLauncher.ViewModels
         
         void Patch()
         {
-            Dispatcher.UIThread.Post(() => PatchTask(), DispatcherPriority.Background);
+            Dispatcher.UIThread.Post(PatchTask, DispatcherPriority.Background);
         }
 
-        private async Task PatchTask()
+        private async void PatchTask()
         {
             try
             {

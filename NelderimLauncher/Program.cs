@@ -7,7 +7,7 @@ namespace NelderimLauncher
 {
     class Program
     {
-        private static FileLogger log = new FileLogger(typeof(Program));
+        private static FileLogger log = new(typeof(Program));
         
         [STAThread]
         public static void Main(string[] args)
