@@ -5,12 +5,10 @@ using Nelderim.Model;
 var BaseName = Process.GetCurrentProcess().ProcessName;
 
 var filePatterns = File.ReadAllLines($"{BaseName}.conf");
-string[] filenames = filePatterns
-    .SelectMany(p => Directory.GetFiles(Directory.GetCurrentDirectory(), p).Select(Path.GetFileName).ToArray())
-    .ToArray();
-Patch[] patches = filenames.Select(filename => new Patch(filename)).ToArray();
+var filenames = filePatterns.SelectMany(p => Directory.GetFiles(Directory.GetCurrentDirectory(), p).Select(Path.GetFileName).ToArray());
+var patches = filenames.Select(filename => new Patch(filename)).ToArray();
 
-using (FileStream stream = File.OpenWrite($"{BaseName}.json"))
+using (var stream = File.OpenWrite($"{BaseName}.json"))
 {
     JsonSerializer.Serialize(stream, patches);
 }

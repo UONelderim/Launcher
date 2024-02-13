@@ -16,7 +16,7 @@ public class Utils
     public static Stream GetAsset(string name)
     {
         return AvaloniaLocator.Current.GetService<IAssetLoader>()
-            .Open(new Uri($"avares://NelderimLauncher/Assets/{name}"));
+            .Open(new Uri($"avares://NelderimLauncherOld/Assets/{name}"));
     }
 
     public static string AppName()

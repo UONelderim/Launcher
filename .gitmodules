@@ -1,0 +1,9 @@
+[submodule "external/ImGui.NET"]
+	path = external/ImGui.NET
+	url = https://github.com/ImGuiNET/ImGui.NET.git
+[submodule "external/FNA"]
+	path = external/FNA
+	url = https://github.com/FNA-XNA/FNA
+[submodule "external/FNA-libs"]
+	path = external/FNA-libs
+	url = https://github.com/deccer/FNA-libs.git

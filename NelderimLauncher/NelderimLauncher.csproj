@@ -1,35 +1,43 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+
     <PropertyGroup>
-        <OutputType>WinExe</OutputType>
-        <TargetFramework>net6.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <!--Avalonia doesen't support TrimMode=link currently,but we are working on that https://github.com/AvaloniaUI/Avalonia/issues/6892 -->
-        <TrimMode>copyused</TrimMode>
-        <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-        <ApplicationIcon>Assets\nelderim.ico</ApplicationIcon>
-        <AssemblyVersion>1.0.0.0</AssemblyVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <ApplicationIcon>icon.ico</ApplicationIcon>
     </PropertyGroup>
+
     <ItemGroup>
-        <AvaloniaResource Include="Assets\**" />
-        <None Remove=".gitignore" />
-    </ItemGroup>
-    <ItemGroup>
-        <!--This helps with theme dll-s trimming.
-        If you will publish your application in self-contained mode with p:PublishTrimmed=true and it will use Fluent theme Default theme will be trimmed from the output and vice versa.
-        https://github.com/AvaloniaUI/Avalonia/issues/5593 -->
-        <TrimmableAssembly Include="Avalonia.Themes.Fluent" />
-        <TrimmableAssembly Include="Avalonia.Themes.Default" />
-    </ItemGroup>
-    <ItemGroup>
-        <PackageReference Include="Avalonia" Version="0.10.17" />
-        <PackageReference Include="Avalonia.Desktop" Version="0.10.17" />
-        <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="0.10.14" />
-        <PackageReference Include="Avalonia.ReactiveUI" Version="0.10.17" />
-        <PackageReference Include="MessageBox.Avalonia" Version="2.0.2" />
-        <PackageReference Include="XamlNameReferenceGenerator" Version="1.3.4" />
-    </ItemGroup>
-    <ItemGroup>
+      <ProjectReference Include="..\external\FNA\FNA.Core.csproj" />
+      <ProjectReference Include="..\external\ImGui.NET\src\ImGui.NET\ImGui.NET.csproj" />
       <ProjectReference Include="..\Nelderim\Nelderim.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="..\external\ImGui.NET\deps\cimgui\win-x64\cimgui.dll" CopyToOutputDirectory="PreserveNewest"/>
+        <Content Include="..\external\ImGui.NET\deps\cimgui\linux-x64\cimgui.so" CopyToOutputDirectory="PreserveNewest"/>
+        <Content Include="..\external\ImGui.NET\deps\cimgui\osx\cimgui.dylib" CopyToOutputDirectory="PreserveNewest"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <DataFiles_libs Include="..\external\fna-libs\**"/>
+        <DataFiles_libs Include="..\lib\**"/>
+        <DataFiles_libs Remove="..\external\fna-libs\.github\**"/>
+        <DataFiles_libs Remove="..\external\fna-libs\.git"/>
+        <DataFiles_libs Remove="..\external\fna-libs\README.txt"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <AvaloniaResource Include="icon.ico" />
+    </ItemGroup>
+
+    <Target Name="CopyExternalDeps_build" AfterTargets="Build">
+        <Copy SourceFiles="@(DataFiles_libs)" DestinationFiles="@(DataFiles_libs->'$(OutDir)/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true"/>
+    </Target>
+
+    <Target Name="CopyExternalDeps_publish" AfterTargets="Publish">
+        <Copy SourceFiles="@(DataFiles_libs)" DestinationFiles="@(DataFiles_libs->'$(PublishDir)/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true"/>
+    </Target>
 </Project>

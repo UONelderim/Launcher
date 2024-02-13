@@ -14,7 +14,7 @@
     </Design.DataContext>
     
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-        <TextBlock HorizontalAlignment="Center">Updating NelderimLauncher</TextBlock>
+        <TextBlock HorizontalAlignment="Center">Updating NelderimLauncherOld</TextBlock>
         <TextBlock HorizontalAlignment="Center" Text="{Binding UpdateMessage}"/>
         <ProgressBar Value="{Binding ProgressValue}" Margin="5" Height="10"></ProgressBar>
     </StackPanel>
