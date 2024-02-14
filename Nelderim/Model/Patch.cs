@@ -10,7 +10,10 @@ public class Patch
     {
         File = file;
         Timestamp = GetLastWriteTime(file).ToString();
-        Sha1 = Crypto.Sha1Hash(OpenRead(file));
+        if (Exists(file))
+        {
+            Sha1 = Crypto.Sha1Hash(OpenRead(file));
+        }
     }
 
     [JsonPropertyName("filename")] public string File { get; set; }

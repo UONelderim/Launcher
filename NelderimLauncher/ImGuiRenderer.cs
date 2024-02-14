@@ -9,6 +9,15 @@ namespace Nelderim.Launcher
 {
     public class ImGuiRenderer
     {
+        public static readonly VertexDeclaration VertexDeclaration = new(
+            // Position
+            new VertexElement(0, VertexElementFormat.Vector2, VertexElementUsage.Position, 0),
+            // UV
+            new VertexElement(8, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0),
+            // Color
+            new VertexElement(16, VertexElementFormat.Color, VertexElementUsage.Color, 0)
+        );
+        
         private Game _game;
 
         private GraphicsDevice _graphicsDevice;
@@ -89,16 +98,14 @@ namespace Nelderim.Launcher
             _loadedTextures.Remove(textureId);
         }
 
-        public virtual void BeforeLayout(GameTime gameTime)
+        public virtual void BeforeDraw(GameTime gameTime)
         {
             ImGui.GetIO().DeltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-
             UpdateInput();
-
             ImGui.NewFrame();
         }
 
-        public virtual void AfterLayout()
+        public virtual void AfterDraw()
         {
             ImGui.Render();
 
@@ -267,8 +274,8 @@ namespace Nelderim.Launcher
                 _vertexBuffer?.Dispose();
 
                 _vertexBufferSize = (int)(drawData.TotalVtxCount * 1.5f);
-                _vertexBuffer = new VertexBuffer(_graphicsDevice, DrawVertDeclaration.Declaration, _vertexBufferSize, BufferUsage.None);
-                _vertexData = new byte[_vertexBufferSize * DrawVertDeclaration.Size];
+                _vertexBuffer = new VertexBuffer(_graphicsDevice, VertexDeclaration, _vertexBufferSize, BufferUsage.None);
+                _vertexData = new byte[_vertexBufferSize * VertexDeclaration.VertexStride];
             }
 
             if (drawData.TotalIdxCount > _indexBufferSize)
@@ -288,10 +295,10 @@ namespace Nelderim.Launcher
             {
                 ImDrawListPtr cmdList = drawData.CmdLists[n];
 
-                fixed (void* vtxDstPtr = &_vertexData[vtxOffset * DrawVertDeclaration.Size])
+                fixed (void* vtxDstPtr = &_vertexData[vtxOffset * VertexDeclaration.VertexStride])
                 fixed (void* idxDstPtr = &_indexData[idxOffset * sizeof(ushort)])
                 {
-                    Buffer.MemoryCopy((void*)cmdList.VtxBuffer.Data, vtxDstPtr, _vertexData.Length, cmdList.VtxBuffer.Size * DrawVertDeclaration.Size);
+                    Buffer.MemoryCopy((void*)cmdList.VtxBuffer.Data, vtxDstPtr, _vertexData.Length, cmdList.VtxBuffer.Size * VertexDeclaration.VertexStride);
                     Buffer.MemoryCopy((void*)cmdList.IdxBuffer.Data, idxDstPtr, _indexData.Length, cmdList.IdxBuffer.Size * sizeof(ushort));
                 }
 
@@ -300,7 +307,7 @@ namespace Nelderim.Launcher
             }
 
             // Copy the managed byte arrays to the gpu vertex- and index buffers
-            _vertexBuffer.SetData(_vertexData, 0, drawData.TotalVtxCount * DrawVertDeclaration.Size);
+            _vertexBuffer.SetData(_vertexData, 0, drawData.TotalVtxCount * VertexDeclaration.VertexStride);
             _indexBuffer.SetData(_indexData, 0, drawData.TotalIdxCount * sizeof(ushort));
         }
 

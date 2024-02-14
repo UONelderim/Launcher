@@ -24,7 +24,7 @@ public static class Http
             }
         }
 
-        float GetProgressPercentage(float totalBytes, float currentBytes) => (totalBytes / currentBytes) * 100f;
+        float GetProgressPercentage(float totalBytes, float currentBytes) => totalBytes / currentBytes;
     }
 
     static async Task CopyToAsync(this Stream source, Stream destination, int bufferSize,
