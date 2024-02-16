@@ -20,6 +20,8 @@ namespace Nelderim.Launcher
         private IntPtr _imGuiTexture;
 
         private bool _updateAvailable;
+        
+        public static readonly HttpClient HttpClient = new();
 
         public NelderimLauncher()
         {
@@ -37,31 +39,6 @@ namespace Nelderim.Launcher
             _imGuiRenderer.RebuildFontAtlas();
             _updateAvailable = IsUpdateAvailable();
             base.Initialize();
-        }
-
-        public static bool IsUpdateAvailable()
-        {
-            using (FileStream stream = File.OpenRead(AppName()))
-            {
-                return Crypto.Sha1Hash(stream) != FetchPatch().Sha1;
-            }
-        }
-
-        public static string AppName()
-        {
-            var app = Process.GetCurrentProcess().ProcessName;
-            if (!app.EndsWith(".exe")) app += ".exe";
-            return app;
-        }
-
-
-        public static Patch FetchPatch()
-        {
-            var patchUrl = Config.Instance.PatchUrl;
-            var patchJson = Http.HttpClient.GetAsync($"{patchUrl}/Nelderim.json").Result.Content.ReadAsStream();
-            var patches = JsonSerializer.Deserialize<List<Patch>>(patchJson);
-
-            return patches.First();
         }
 
         protected override void LoadContent()
@@ -94,7 +71,7 @@ namespace Nelderim.Launcher
         private bool _refreshDisabled;
         private bool _downloading;
         private string _downloadFileName = "";
-        private float _downloadProgress = 0.0f;
+        private float _downloadProgress;
 
         private const int buttonHeight = 40;
 
@@ -109,63 +86,85 @@ namespace Nelderim.Launcher
             {
                 if (_updateAvailable)
                 {
-                    ImGui.Text("Dostepna aktualizacja Nelderim Launcher");
-                    ImGui.Text("Obecna wersja: TODO");
-                    ImGui.Text("Nowa wersja: TODO");
-                    if (ImGui.Button("Aktualizuj"))
-                    {
-                        LauncherUpdate([]);
-                    }
-                    if (ImGui.Button("Pomin"))
-                    {
-                        _updateAvailable = false;
-                    }
-                }
-                ImGui.InputText("", ref _PatchUrl, 256);
-                ImGui.SameLine();
-                ImGui.BeginDisabled(_refreshDisabled);
-                if (ImGui.Button("Odswiez", new System.Numerics.Vector2(ImGui.GetContentRegionAvail().X, buttonHeight)))
-                {
-                    new Task(Refresh).Start();
-                }
-
-                ImGui.EndDisabled();
-                var size2 = ImGui.GetContentRegionAvail();
-                size2.Y -= buttonHeight;
-                ImGui.BeginChild("Log", size2, ImGuiChildFlags.Border);
-                ImGui.TextUnformatted(_logText);
-                ImGui.EndChild();
-                var size3 = ImGui.GetContentRegionAvail();
-                if (!_downloading)
-                {
-                    if (ImGui.Button("Aktualizuj", size3))
-                    {
-                        new Task(Patch).Start();
-                    }
+                    DrawUpdateUI();
                 }
                 else
                 {
-                    var posY = ImGui.GetCursorPosY();
-                    ImGui.ProgressBar(_downloadProgress, size3, "");
-                    var text = $"{_downloadFileName} {_downloadProgress * 100f:F0}%";
-                    var textSize = ImGui.CalcTextSize(text);
-                    ImGui.SetCursorPosX(size3.X / 2 - textSize.X / 2);
-                    ImGui.SetCursorPosY(ImGui.GetCursorPosY() - buttonHeight / 2 - textSize.Y / 2);
-                    ImGui.TextUnformatted(text);
-                }
-
-                if (show_test_window)
-                {
-                    ImGui.SetNextWindowPos(new Num.Vector2(650, 20), ImGuiCond.FirstUseEver);
-                    ImGui.ShowDemoWindow(ref show_test_window);
-                }
-                if (ImGui.IsKeyPressed(ImGuiKey.F12))
-                {
-                    show_test_window = !show_test_window;
+                    DrawMainUI();
                 }
             }
 
             ImGui.End();
+        }
+
+        public void DrawMainUI()
+        {
+            ImGui.InputText("", ref _PatchUrl, 256);
+            ImGui.SameLine();
+            ImGui.BeginDisabled(_refreshDisabled);
+            if (ImGui.Button("Odswiez", new System.Numerics.Vector2(ImGui.GetContentRegionAvail().X, buttonHeight)))
+            {
+                new Task(Refresh).Start();
+            }
+
+            ImGui.EndDisabled();
+            var size2 = ImGui.GetContentRegionAvail();
+            size2.Y -= buttonHeight;
+            ImGui.BeginChild("Log", size2, ImGuiChildFlags.Border);
+            ImGui.TextUnformatted(_logText);
+            ImGui.EndChild();
+            var size3 = ImGui.GetContentRegionAvail();
+            if (!_downloading)
+            {
+                if (ImGui.Button("Aktualizuj", size3))
+                {
+                    new Task(Patch).Start();
+                }
+            }
+            else
+            {
+                var posY = ImGui.GetCursorPosY();
+                ImGui.ProgressBar(_downloadProgress, size3, "");
+                var text = $"{_downloadFileName} {_downloadProgress * 100f:F0}%";
+                var textSize = ImGui.CalcTextSize(text);
+                ImGui.SetCursorPosX(size3.X / 2 - textSize.X / 2);
+                ImGui.SetCursorPosY(ImGui.GetCursorPosY() - buttonHeight / 2 - textSize.Y / 2);
+                ImGui.TextUnformatted(text);
+            }
+
+            if (show_test_window)
+            {
+                ImGui.SetNextWindowPos(new Num.Vector2(650, 20), ImGuiCond.FirstUseEver);
+                ImGui.ShowDemoWindow(ref show_test_window);
+            }
+            if (ImGui.IsKeyPressed(ImGuiKey.F12))
+            {
+                show_test_window = !show_test_window;
+            }
+        }
+
+        public void DrawUpdateUI()
+        {
+            ImGui.Text("Dostepna aktualizacja Nelderim Launcher");
+            ImGui.Text("Obecna wersja: TODO");
+            ImGui.Text("Nowa wersja: TODO");
+            if (ImGui.Button("Aktualizuj"))
+            {
+                    var nelderimApp = AppName();
+                    var appCopyName = $"_{nelderimApp}";
+                    File.Copy(nelderimApp, appCopyName, true);
+            
+                    var process = new Process();
+                    process.StartInfo.FileName = appCopyName;
+                    process.StartInfo.Arguments = $"update {nelderimApp}";
+                    process.Start();
+                    Exit();
+                LauncherUpdate([]);
+            }
+            if (ImGui.Button("Pomin"))
+            {
+                _updateAvailable = false;
+            }
         }
 
         private static List<PatchInfo> _patchInfos = new();
@@ -180,7 +179,7 @@ namespace Nelderim.Launcher
             _refreshDisabled = true;
             try
             {
-                var response = await Http.HttpClient.GetAsync($"{_PatchUrl}/NelderimPatch.json");
+                var response = await HttpClient.GetAsync($"{_PatchUrl}/NelderimPatch.json");
                 var responseBody = await response.Content.ReadAsStringAsync();
                 var patches = JsonSerializer.Deserialize<List<Patch>>(responseBody);
                 _patchInfos = patches.ConvertAll(p => new PatchInfo(p)).FindAll(p => p.ShouldUpdate);
@@ -223,7 +222,7 @@ namespace Nelderim.Launcher
                     progress.ProgressChanged += OnProgressOnProgressChanged;
                     using (var file = new FileStream(Path.GetFullPath(info.Filename), FileMode.OpenOrCreate))
                     {
-                        await Http.HttpClient.DownloadDataAsync($"{_PatchUrl}/{info.Filename}", file, progress);
+                        await HttpClient.DownloadDataAsync($"{_PatchUrl}/{info.Filename}", file, progress);
                     }
 
                     progress.ProgressChanged -= OnProgressOnProgressChanged;
@@ -292,6 +291,32 @@ namespace Nelderim.Launcher
 
             texture.SetData(data);
             return texture;
+        }
+        
+        
+        public static bool IsUpdateAvailable()
+        {
+            using (FileStream stream = File.OpenRead(AppName()))
+            {
+                return Crypto.Sha1Hash(stream) != FetchPatch().Sha1;
+            }
+        }
+
+        public static string AppName()
+        {
+            var app = Process.GetCurrentProcess().ProcessName;
+            if (!app.EndsWith(".exe")) app += ".exe";
+            return app;
+        }
+
+
+        public static Patch FetchPatch()
+        {
+            var patchUrl = Config.Instance.PatchUrl;
+            var patchJson = HttpClient.GetAsync($"{patchUrl}/Nelderim.json").Result.Content.ReadAsStream();
+            var patches = JsonSerializer.Deserialize<List<Patch>>(patchJson);
+
+            return patches.First();
         }
     }
 }
