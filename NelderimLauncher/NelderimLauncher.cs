@@ -1,8 +1,6 @@
-﻿using System.ComponentModel;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.Json;
 using ImGuiNET;
-using Microsoft.VisualBasic.CompilerServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Nelderim.Model;
@@ -13,29 +11,30 @@ namespace Nelderim.Launcher
 {
     public class NelderimLauncher : Game
     {
-        private GraphicsDeviceManager _graphics;
+        private readonly HttpClient HttpClient = new();
+        
+        private GraphicsDeviceManager _gdm;
         private ImGuiRenderer _imGuiRenderer;
 
-        private Texture2D _xnaTexture;
-        private IntPtr _imGuiTexture;
+        private Texture2D? _xnaTexture;
+        private IntPtr? _imGuiTexture;
 
         private bool _updateAvailable;
-        
-        public static readonly HttpClient HttpClient = new();
 
         public NelderimLauncher()
         {
-            _graphics = new GraphicsDeviceManager(this);
-            _graphics.PreferredBackBufferWidth = 600;
-            _graphics.PreferredBackBufferHeight = 300;
-            _graphics.PreferMultiSampling = true;
+            _gdm = new GraphicsDeviceManager(this);
+            _gdm.PreferredBackBufferWidth = 600;
+            _gdm.PreferredBackBufferHeight = 300;
+            _gdm.PreferMultiSampling = true;
             IsMouseVisible = true;
             Window.AllowUserResizing = true;
+            _downloadProgressHandler = new Progress<float>(f => _downloadProgressValue = f);
         }
 
         protected override void Initialize()
         {
-            _imGuiRenderer = new ImGuiRenderer(this);
+            _imGuiRenderer = new ImGuiRenderer(_gdm.GraphicsDevice);
             _imGuiRenderer.RebuildFontAtlas();
             _updateAvailable = IsUpdateAvailable();
             base.Initialize();
@@ -58,24 +57,24 @@ namespace Nelderim.Launcher
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.Black);
-            _imGuiRenderer.BeforeDraw(gameTime);
+            _imGuiRenderer.BeforeDraw(gameTime, IsActive);
             DrawUI();
             _imGuiRenderer.AfterDraw();
 
             base.Draw(gameTime);
         }
 
-        private bool show_test_window;
-        private string _PatchUrl = "https://www.nelderim.pl/patch";
+        private bool _showTestWindow;
+        private string _patchUrl = "https://www.nelderim.pl/patch";
         private string _logText = "";
-        private bool _refreshDisabled;
+        private bool _refreshing;
         private bool _downloading;
         private string _downloadFileName = "";
-        private float _downloadProgress;
+        private float _downloadProgressValue;
 
         private const int buttonHeight = 40;
 
-        protected virtual void DrawUI()
+        private void DrawUI()
         {
             var viewport = ImGui.GetMainViewport();
             ImGui.SetNextWindowPos(viewport.WorkPos);
@@ -97,11 +96,11 @@ namespace Nelderim.Launcher
             ImGui.End();
         }
 
-        public void DrawMainUI()
+        private void DrawMainUI()
         {
-            ImGui.InputText("", ref _PatchUrl, 256);
+            ImGui.InputText("", ref _patchUrl, 256);
             ImGui.SameLine();
-            ImGui.BeginDisabled(_refreshDisabled);
+            ImGui.BeginDisabled(_refreshing);
             if (ImGui.Button("Odswiez", new System.Numerics.Vector2(ImGui.GetContentRegionAvail().X, buttonHeight)))
             {
                 new Task(Refresh).Start();
@@ -124,26 +123,26 @@ namespace Nelderim.Launcher
             else
             {
                 var posY = ImGui.GetCursorPosY();
-                ImGui.ProgressBar(_downloadProgress, size3, "");
-                var text = $"{_downloadFileName} {_downloadProgress * 100f:F0}%";
+                ImGui.ProgressBar(_downloadProgressValue, size3, "");
+                var text = $"{_downloadFileName} {_downloadProgressValue * 100f:F0}%";
                 var textSize = ImGui.CalcTextSize(text);
                 ImGui.SetCursorPosX(size3.X / 2 - textSize.X / 2);
                 ImGui.SetCursorPosY(ImGui.GetCursorPosY() - buttonHeight / 2 - textSize.Y / 2);
                 ImGui.TextUnformatted(text);
             }
 
-            if (show_test_window)
+            if (_showTestWindow)
             {
                 ImGui.SetNextWindowPos(new Num.Vector2(650, 20), ImGuiCond.FirstUseEver);
-                ImGui.ShowDemoWindow(ref show_test_window);
+                ImGui.ShowDemoWindow(ref _showTestWindow);
             }
             if (ImGui.IsKeyPressed(ImGuiKey.F12))
             {
-                show_test_window = !show_test_window;
+                _showTestWindow = !_showTestWindow;
             }
         }
 
-        public void DrawUpdateUI()
+        private void DrawUpdateUI()
         {
             ImGui.Text("Dostepna aktualizacja Nelderim Launcher");
             ImGui.Text("Obecna wersja: TODO");
@@ -167,7 +166,7 @@ namespace Nelderim.Launcher
             }
         }
 
-        private static List<PatchInfo> _patchInfos = new();
+        private List<PatchInfo> _patchInfos = new();
 
         private void Log(string text)
         {
@@ -176,10 +175,10 @@ namespace Nelderim.Launcher
 
         private async void Refresh()
         {
-            _refreshDisabled = true;
+            _refreshing = true;
             try
             {
-                var response = await HttpClient.GetAsync($"{_PatchUrl}/NelderimPatch.json");
+                var response = await HttpClient.GetAsync($"{_patchUrl}/NelderimPatch.json");
                 var responseBody = await response.Content.ReadAsStringAsync();
                 var patches = JsonSerializer.Deserialize<List<Patch>>(responseBody);
                 _patchInfos = patches.ConvertAll(p => new PatchInfo(p)).FindAll(p => p.ShouldUpdate);
@@ -199,14 +198,12 @@ namespace Nelderim.Launcher
             }
             finally
             {
-                _refreshDisabled = false;
+                _refreshing = false;
             }
         }
 
-        private void OnProgressOnProgressChanged(object sender, float f)
-        {
-            _downloadProgress = f;
-        }
+
+        private Progress<float> _downloadProgressHandler;
 
         private async void Patch()
         {
@@ -217,17 +214,9 @@ namespace Nelderim.Launcher
                 {
                     Log($"Pobieram {info.Filename}");
                     _downloadFileName = info.Filename;
-                    var progress = new Progress<float>();
-
-                    progress.ProgressChanged += OnProgressOnProgressChanged;
-                    using (var file = new FileStream(Path.GetFullPath(info.Filename), FileMode.OpenOrCreate))
-                    {
-                        await HttpClient.DownloadDataAsync($"{_PatchUrl}/{info.Filename}", file, progress);
-                    }
-
-                    progress.ProgressChanged -= OnProgressOnProgressChanged;
+                    using var file = new FileStream(Path.GetFullPath(info.Filename), FileMode.OpenOrCreate);
+                    await HttpClient.DownloadDataAsync($"{_patchUrl}/{info.Filename}", file, _downloadProgressHandler);
                 }
-
                 Log("Wszystkie pliki sa aktualne");
             }
             catch (Exception e)
@@ -238,9 +227,9 @@ namespace Nelderim.Launcher
             {
                 _downloading = false;
                 _patchInfos = new();
-                _downloadProgress = 0f;
+                _downloadProgressValue = 0f;
                 _downloadFileName = "";
-                _downloading = false;
+                _downloading  = false;
             }
         }
 
@@ -280,7 +269,7 @@ namespace Nelderim.Launcher
         }
 
         //We can later use this for displaying graphics
-        public static Texture2D CreateTexture(GraphicsDevice device, int width, int height, Func<int, Color> paint)
+        private Texture2D CreateTexture(GraphicsDevice device, int width, int height, Func<int, Color> paint)
         {
             var texture = new Texture2D(device, width, height);
             Color[] data = new Color[width * height];
@@ -292,9 +281,9 @@ namespace Nelderim.Launcher
             texture.SetData(data);
             return texture;
         }
-        
-        
-        public static bool IsUpdateAvailable()
+
+
+        private bool IsUpdateAvailable()
         {
             using (FileStream stream = File.OpenRead(AppName()))
             {
@@ -302,7 +291,7 @@ namespace Nelderim.Launcher
             }
         }
 
-        public static string AppName()
+        private string AppName()
         {
             var app = Process.GetCurrentProcess().ProcessName;
             if (!app.EndsWith(".exe")) app += ".exe";
@@ -310,7 +299,7 @@ namespace Nelderim.Launcher
         }
 
 
-        public static Patch FetchPatch()
+        private Patch FetchPatch()
         {
             var patchUrl = Config.Instance.PatchUrl;
             var patchJson = HttpClient.GetAsync($"{patchUrl}/Nelderim.json").Result.Content.ReadAsStream();

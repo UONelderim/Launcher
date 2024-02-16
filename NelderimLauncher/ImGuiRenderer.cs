@@ -1,5 +1,4 @@
-﻿﻿using System.Net.Mime;
- using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System.Runtime.InteropServices;
@@ -18,8 +17,6 @@ namespace Nelderim.Launcher
             new VertexElement(16, VertexElementFormat.Color, VertexElementUsage.Color, 0)
         );
         
-        private Game _game;
-
         private GraphicsDevice _graphicsDevice;
 
         private BasicEffect _effect;
@@ -42,13 +39,12 @@ namespace Nelderim.Launcher
         private readonly float WHEEL_DELTA = 120;
         private Keys[] _allKeys = Enum.GetValues<Keys>();
 
-        public ImGuiRenderer(Game game)
+        public ImGuiRenderer(GraphicsDevice gd)
         {
             var context = ImGui.CreateContext();
             ImGui.SetCurrentContext(context);
 
-            _game = game ?? throw new ArgumentNullException(nameof(game));
-            _graphicsDevice = game.GraphicsDevice;
+            _graphicsDevice = gd;
 
             _loadedTextures = new Dictionary<IntPtr, Texture2D>();
 
@@ -62,7 +58,14 @@ namespace Nelderim.Launcher
                 SlopeScaleDepthBias = 0
             };
 
-            SetupInput();
+            var io = ImGui.GetIO();
+
+            TextInputEXT.TextInput += c =>
+            {
+                if (c == '\t') return;
+
+                io.AddInputCharacter(c);
+            };
         }
 
         public virtual unsafe void RebuildFontAtlas()
@@ -98,10 +101,10 @@ namespace Nelderim.Launcher
             _loadedTextures.Remove(textureId);
         }
 
-        public virtual void BeforeDraw(GameTime gameTime)
+        public virtual void BeforeDraw(GameTime gameTime, bool active)
         {
             ImGui.GetIO().DeltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-            UpdateInput();
+            UpdateInput(active);
             ImGui.NewFrame();
         }
 
@@ -109,25 +112,11 @@ namespace Nelderim.Launcher
         {
             ImGui.Render();
 
-            unsafe { RenderDrawData(ImGui.GetDrawData()); }
-        }
-
-        protected virtual void SetupInput()
-        {
-            var io = ImGui.GetIO();
-
-            TextInputEXT.TextInput += c =>
-            {
-                if (c == '\t') return;
-
-                ImGui.GetIO().AddInputCharacter(c);
-            };
+            RenderDrawData(ImGui.GetDrawData());
         }
 
         protected virtual Effect UpdateEffect(Texture2D texture)
         {
-            _effect ??= new BasicEffect(_graphicsDevice);
-
             var io = ImGui.GetIO();
 
             _effect.World = Matrix.Identity;
@@ -140,9 +129,9 @@ namespace Nelderim.Launcher
             return _effect;
         }
 
-        protected virtual void UpdateInput()
+        protected virtual void UpdateInput(bool active)
         {
-            if (!_game.IsActive) return;
+            if (!active) return;
             
             var io = ImGui.GetIO();
 
