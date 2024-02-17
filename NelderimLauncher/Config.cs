@@ -11,6 +11,11 @@ public static class Config
 {
     public static ConfigRoot Instance;
     private static string _configFilePath = "NelderimLauncher.json";
+
+    private static readonly JsonSerializerOptions SerializerOptions = new()
+    {
+        IncludeFields = true
+    };
     
     static Config()
     {
@@ -21,11 +26,11 @@ public static class Config
         }
 
         var jsonText = File.ReadAllText(_configFilePath);
-        Instance = JsonSerializer.Deserialize<ConfigRoot>(jsonText);
+        Instance = JsonSerializer.Deserialize<ConfigRoot>(jsonText, SerializerOptions);
     }
 
     public static void Save()
     {
-        File.WriteAllText(_configFilePath, JsonSerializer.Serialize(Instance));
+        File.WriteAllText(_configFilePath, JsonSerializer.Serialize(Instance, SerializerOptions));
     }
 }
