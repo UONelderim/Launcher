@@ -117,6 +117,8 @@ namespace Nelderim.Launcher
 
         protected virtual Effect UpdateEffect(Texture2D texture)
         {
+            _effect ??= new BasicEffect(_graphicsDevice);
+            
             var io = ImGui.GetIO();
 
             _effect.World = Matrix.Identity;
