@@ -7,6 +7,15 @@
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ApplicationIcon>icon.ico</ApplicationIcon>
+        <OutDir>..\output</OutDir>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+      <PlatformTarget>AnyCPU</PlatformTarget>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+      <PlatformTarget>AnyCPU</PlatformTarget>
     </PropertyGroup>
 
     <ItemGroup>
@@ -14,30 +23,30 @@
       <ProjectReference Include="..\external\ImGui.NET\src\ImGui.NET\ImGui.NET.csproj" />
       <ProjectReference Include="..\Nelderim\Nelderim.csproj" />
     </ItemGroup>
-
-    <ItemGroup>
+    
+    <ItemGroup Condition="$(RuntimeIdentifier) == 'win-x64' or $(RuntimeIdentifier) == ''">
+        <Content Include="..\external\fna-libs\x64\**" CopyToOutputDirectory="PreserveNewest"/>
         <Content Include="..\external\ImGui.NET\deps\cimgui\win-x64\cimgui.dll" CopyToOutputDirectory="PreserveNewest"/>
+    </ItemGroup>
+
+    <ItemGroup Condition="$(RuntimeIdentifier) == 'win-x86' or $(RuntimeIdentifier) == ''">
+        <Content Include="..\external\fna-libs\x86\**" CopyToOutputDirectory="PreserveNewest"/>
+        <Content Include="..\external\ImGui.NET\deps\cimgui\win-x86\cimgui.dll" CopyToOutputDirectory="PreserveNewest"/>
+    </ItemGroup>
+    
+    <ItemGroup Condition="$(RuntimeIdentifier) == 'linux-x64' or $(RuntimeIdentifier) == ''">
+        <Content Include="..\external\fna-libs\lib64\**" CopyToOutputDirectory="PreserveNewest"/>
         <Content Include="..\external\ImGui.NET\deps\cimgui\linux-x64\cimgui.so" CopyToOutputDirectory="PreserveNewest"/>
+    </ItemGroup>
+    
+    <ItemGroup Condition="$(RuntimeIdentifier) == 'osx-x64' or $(RuntimeIdentifier) == ''">
+        <Content Include="..\external\fna-libs\osx\**" CopyToOutputDirectory="PreserveNewest"/>
         <Content Include="..\external\ImGui.NET\deps\cimgui\osx\cimgui.dylib" CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
-
+    
     <ItemGroup>
-        <DataFiles_libs Include="..\external\fna-libs\**"/>
-        <DataFiles_libs Include="..\lib\**"/>
-        <DataFiles_libs Remove="..\external\fna-libs\.github\**"/>
-        <DataFiles_libs Remove="..\external\fna-libs\.git"/>
-        <DataFiles_libs Remove="..\external\fna-libs\README.txt"/>
+        <DontInclude Remove="..\external\fna-libs\.github\**"/>
+        <DontInclude Remove="..\external\fna-libs\.git"/>
+        <DontInclude Remove="..\external\fna-libs\README.txt"/>
     </ItemGroup>
-
-    <ItemGroup>
-      <AvaloniaResource Include="icon.ico" />
-    </ItemGroup>
-
-    <Target Name="CopyExternalDeps_build" AfterTargets="Build">
-        <Copy SourceFiles="@(DataFiles_libs)" DestinationFiles="@(DataFiles_libs->'$(OutDir)/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true"/>
-    </Target>
-
-    <Target Name="CopyExternalDeps_publish" AfterTargets="Publish">
-        <Copy SourceFiles="@(DataFiles_libs)" DestinationFiles="@(DataFiles_libs->'$(PublishDir)/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true"/>
-    </Target>
 </Project>
