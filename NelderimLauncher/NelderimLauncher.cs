@@ -250,7 +250,7 @@ namespace Nelderim.Launcher
             var currentPath = Environment.ProcessPath;
             var newPath = $"{currentPath}.autoupdate";
             using var file = new FileStream(newPath, FileMode.OpenOrCreate);
-            await HttpClient.DownloadDataAsync($"{PatchUrl}/{_autoUpdateInfos.First().File}", file, _downloadProgressHandler);
+            await HttpClient.DownloadDataAsync($"{PatchUrl}/{_autoUpdateInfos.First().Filename}", file, _downloadProgressHandler);
             var process = new Process();
             process.StartInfo.FileName = newPath;
             process.StartInfo.Arguments = $"autoupdate {currentPath}";

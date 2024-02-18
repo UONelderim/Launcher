@@ -1,22 +1,22 @@
 ﻿using System.Text.Json.Serialization;
 using Nelderim.Utility;
-using static System.IO.File;
 
 namespace Nelderim.Model;
 
 public class Patch
 {
-    public Patch(string file)
+    public Patch(string filename)
     {
-        File = file;
-        Timestamp = GetLastWriteTime(file).ToString();
-        if (Exists(file))
+        Filename = filename;
+        Timestamp = File.GetLastWriteTime(filename).ToString();
+        if (File.Exists(filename))
         {
-            Sha1 = Crypto.Sha1Hash(OpenRead(file));
+            using var fileStream = File.OpenRead(filename);
+            Sha1 = Crypto.Sha1Hash(fileStream);
         }
     }
 
-    [JsonPropertyName("filename")] public string File { get; set; }
+    [JsonPropertyName("filename")] public string Filename { get; set; }
 
     [JsonPropertyName("timestamp")] public string Timestamp { get; set; }
 
