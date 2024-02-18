@@ -200,7 +200,7 @@ namespace Nelderim.Launcher
                 }
                 else
                 {
-                    Log("Wszystkie pliki aktualne");
+                    Log("Wszystkie pliki sa aktualne");
                 }
             }
             catch (Exception e)
@@ -225,6 +225,7 @@ namespace Nelderim.Launcher
                 {
                     Log($"Pobieram {info.Filename}");
                     _downloadFileName = info.Filename;
+                    File.Delete(info.Filename);
                     using var file = new FileStream(Path.GetFullPath(info.Filename), FileMode.OpenOrCreate);
                     await HttpClient.DownloadDataAsync($"{PatchUrl}/{info.Filename}", file, _downloadProgressHandler);
                 }
