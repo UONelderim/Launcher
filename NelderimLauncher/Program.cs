@@ -1,7 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Runtime.Loader;
 
 namespace Nelderim.Launcher
 {
@@ -32,7 +29,6 @@ namespace Nelderim.Launcher
                         process.StartInfo.FileName = Path.GetFullPath(targetPath);
                         process.StartInfo.Arguments = "Aktualizacja zakonczona pomyslnie";
                         process.Start();
-                        File.Delete(currentProcessPath); //Will this even work?
                     }
                 }
             }

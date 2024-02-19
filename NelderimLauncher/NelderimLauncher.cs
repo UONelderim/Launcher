@@ -170,7 +170,7 @@ namespace Nelderim.Launcher
         private void DrawUpdateUI()
         {
             ImGui.Text("Dostepna aktualizacja Nelderim Launcher");
-            ImGui.Text("Obecna wersja: TODO");
+            ImGui.Text($"Obecna wersja: {Version}");
             ImGui.Text("Nowa wersja: TODO");
             if (ImGui.Button("Aktualizuj"))
             {
@@ -246,9 +246,16 @@ namespace Nelderim.Launcher
         private async void AutoUpdate()
         {
             var currentPath = Environment.ProcessPath;
-            var newPath = $"{currentPath}.autoupdate";
-            using var file = new FileStream(newPath, FileMode.OpenOrCreate);
-            await HttpClient.DownloadDataAsync($"{PatchUrl}/{_autoUpdateInfos.First().Filename}", file, _downloadProgressHandler);
+            var dir = Path.GetDirectoryName(currentPath);
+            var filename = Path.GetFileName(currentPath);
+            var newPath = $"{dir}/_{filename}";
+            await using (var file = new FileStream(newPath, FileMode.OpenOrCreate))
+            {
+                await HttpClient.DownloadDataAsync($"{PatchUrl}/{_autoUpdateInfos.First().Filename}",
+                    file,
+                    _downloadProgressHandler);
+            }
+
             var process = new Process();
             process.StartInfo.FileName = newPath;
             process.StartInfo.Arguments = $"autoupdate {currentPath}";
