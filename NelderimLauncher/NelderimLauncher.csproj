@@ -24,7 +24,7 @@
       <ProjectReference Include="..\Nelderim\Nelderim.csproj" />
     </ItemGroup>
     
-    <PropertyGroup Condition="$(RunnerOs) != ''"> <!-- publish -->
+    <PropertyGroup Condition="$(RuntimeIdentifier) != '' || $(RunnerOs) != ''"> <!-- publish -->
         <PublishSingleFile>true</PublishSingleFile>
         <SelfContained>false</SelfContained>
         <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
