@@ -8,6 +8,9 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ApplicationIcon>icon.ico</ApplicationIcon>
         <OutDir>..\output</OutDir>
+        <PublishSingleFile>true</PublishSingleFile>
+        <SelfContained>false</SelfContained>
+        <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
