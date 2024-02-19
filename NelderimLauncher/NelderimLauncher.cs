@@ -1,5 +1,5 @@
 ﻿using System.Diagnostics;
-using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
@@ -12,6 +12,7 @@ namespace Nelderim.Launcher
 {
     public class NelderimLauncher : Game
     {
+        private const string Version = "1.1.0"; //Pass me from outside
         private readonly HttpClient HttpClient = new();
 
         private GraphicsDeviceManager _gdm;
@@ -34,8 +35,7 @@ namespace Nelderim.Launcher
             IsMouseVisible = true;
             Window.AllowUserResizing = true;
             _downloadProgressHandler = new Progress<float>(f => _downloadProgressValue = f);
-            var version = Assembly.GetEntryAssembly().GetName().Version;
-            Window.Title = $"Nelderim Launcher {version.Major}.{version.Minor}.{version.Revision}";
+            Window.Title = $"Nelderim Launcher {Version}";
         }
 
         protected override void Initialize()
