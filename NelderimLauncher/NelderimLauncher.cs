@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Reflection;
 using System.Text.Json;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
@@ -33,6 +34,8 @@ namespace Nelderim.Launcher
             IsMouseVisible = true;
             Window.AllowUserResizing = true;
             _downloadProgressHandler = new Progress<float>(f => _downloadProgressValue = f);
+            var version = Assembly.GetEntryAssembly().GetName().Version;
+            Window.Title = $"Nelderim Launcher {version.Major}.{version.Minor}.{version.Revision}";
         }
 
         protected override void Initialize()
@@ -178,12 +181,6 @@ namespace Nelderim.Launcher
                 _updateAvailable = false;
             }
         }
-
-        private void Log(string text)
-        {
-            _logText += text + "\n";
-        }
-
         private async void Refresh()
         {
             _refreshing = true;
@@ -261,10 +258,8 @@ namespace Nelderim.Launcher
 
         private bool IsUpdateAvailable()
         {
-            using (FileStream stream = File.OpenRead(Environment.ProcessPath ?? ""))
-            {
-                return Crypto.Sha1Hash(stream) != _autoUpdateInfos.First().Sha1;
-            }
+            using FileStream stream = File.OpenRead(Environment.ProcessPath ?? "");
+            return Crypto.Sha1Hash(stream) != _autoUpdateInfos.First().Sha1;
         }
 
         private List<Patch> FetchAutoUpdateInfo()
@@ -272,6 +267,11 @@ namespace Nelderim.Launcher
             var patchUrl = Config.Instance.PatchUrl;
             var patchJson = HttpClient.GetAsync($"{patchUrl}/Nelderim.json").Result.Content.ReadAsStream();
             return JsonSerializer.Deserialize<List<Patch>>(patchJson);
+        }
+        
+        private void Log(string text)
+        {
+            _logText += text + "\n";
         }
     }
 }

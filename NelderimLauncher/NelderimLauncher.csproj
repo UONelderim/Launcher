@@ -8,9 +8,6 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ApplicationIcon>icon.ico</ApplicationIcon>
         <OutDir>..\output</OutDir>
-        <PublishSingleFile>true</PublishSingleFile>
-        <SelfContained>false</SelfContained>
-        <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -26,6 +23,12 @@
       <ProjectReference Include="..\external\ImGui.NET\src\ImGui.NET\ImGui.NET.csproj" />
       <ProjectReference Include="..\Nelderim\Nelderim.csproj" />
     </ItemGroup>
+    
+    <PropertyGroup Condition="$(RuntimeIdentifier) != ''"> <!-- publish -->
+        <PublishSingleFile>true</PublishSingleFile>
+        <SelfContained>false</SelfContained>
+        <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    </PropertyGroup>
     
     <ItemGroup Condition="$(RuntimeIdentifier) == 'win-x64' or $(RuntimeIdentifier) == ''">
         <Content Include="..\external\fna-libs\x64\**" CopyToOutputDirectory="PreserveNewest"/>
