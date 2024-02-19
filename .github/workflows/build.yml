@@ -37,4 +37,6 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: NelderimLauncher-${{ runner.os }}-${{ runner.arch }}
-          path: ${{ github.workspace }}/release/NelderimLauncher.exe
+          path: |
+            ${{ github.workspace }}/release/NelderimLauncher.exe 
+            ${{ github.workspace }}/release/NelderimLauncher
