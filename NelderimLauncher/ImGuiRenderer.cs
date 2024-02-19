@@ -59,7 +59,6 @@ namespace Nelderim.Launcher
             };
 
             var io = ImGui.GetIO();
-            io.WantSaveIniSettings = false;
 
             TextInputEXT.TextInput += c =>
             {
