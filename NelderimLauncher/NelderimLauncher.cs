@@ -258,6 +258,8 @@ namespace Nelderim.Launcher
 
         private bool IsUpdateAvailable()
         {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return false;
+            
             using FileStream stream = File.OpenRead(Environment.ProcessPath ?? "");
             return Crypto.Sha1Hash(stream) != _autoUpdateInfos.First().Sha1;
         }
