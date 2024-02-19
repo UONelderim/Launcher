@@ -1,54 +1,36 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using IniParser;
-using IniParser.Model;
+﻿using System.Text.Json;
 
-namespace NelderimLauncher;
+namespace Nelderim.Launcher;
 
-public class Config
+public class ConfigRoot
 {
-    public class Key
-    {
-        public static string PatchUrl => "config.patchUrl";
-    }
+    public string PatchUrl = "https://www.nelderim.pl/patch";
+}
 
-    private static Dictionary<String, String> DefaultValues = new()
+public static class Config
+{
+    public static ConfigRoot Instance;
+    private static string _configFilePath = "NelderimLauncher.json";
+
+    private static readonly JsonSerializerOptions SerializerOptions = new()
     {
-        { Key.PatchUrl, "https://nelderim.pl/patch" },
+        IncludeFields = true
     };
-
-    private static FileIniDataParser parser = new();
-    private static IniData? _iniData;
-    private static readonly string ConfigFilePath = $"{System.Diagnostics.Process.GetCurrentProcess().ProcessName}.ini";
-
-    private static void Init()
+    
+    static Config()
     {
-        if (!File.Exists(ConfigFilePath))
+        if (!File.Exists(_configFilePath))
         {
-            File.Create(ConfigFilePath).Close();
+            var newConfig = new ConfigRoot();
+            File.WriteAllText(_configFilePath, JsonSerializer.Serialize(newConfig));
         }
 
-        _iniData = parser.ReadFile(ConfigFilePath);
+        var jsonText = File.ReadAllText(_configFilePath);
+        Instance = JsonSerializer.Deserialize<ConfigRoot>(jsonText, SerializerOptions);
     }
 
-    public static string Get(string key)
+    public static void Save()
     {
-        if (_iniData == null) Init();
-        if (!_iniData.TryGetKey(key, out var result))
-        {
-            result = DefaultValues[key];
-        }
-
-        return result;
-    }
-
-    public static void Set(string key, string value)
-    {
-        if (_iniData == null) Init();
-        var parts = key.Split(".");
-        if (parts.Length != 2) throw new ArgumentException("Config key can have only two parts :(");
-        _iniData[parts[0]][parts[1]] = value;
-        parser.WriteFile(ConfigFilePath, _iniData);
+        File.WriteAllText(_configFilePath, JsonSerializer.Serialize(Instance, SerializerOptions));
     }
 }

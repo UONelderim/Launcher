@@ -12,16 +12,14 @@ public class PatchInfo
 
     public PatchInfo(Patch patch)
     {
-        Filename = patch.File;
+        Filename = patch.Filename;
         Timestamp = patch.Timestamp;
         Remotesha1 = patch.Sha1;
         if (File.Exists(Filename))
         {
-            using (FileStream stream = File.OpenRead(Filename))
-            {
-                Localsha1 = Crypto.Sha1Hash(stream);
-                ShouldUpdate = Localsha1 != Remotesha1;
-            }
+            using var fileStream = File.OpenRead(Filename);
+            Localsha1 = Crypto.Sha1Hash(fileStream);
+            ShouldUpdate = Localsha1 != Remotesha1;
         }
         else
         {
