@@ -10,6 +10,12 @@
         <OutDir>..\output</OutDir>
     </PropertyGroup>
 
+    <PropertyGroup>
+        <IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</IsWindows>
+        <IsOSX Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</IsOSX>
+        <IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
+    </PropertyGroup>
+    
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
       <PlatformTarget>AnyCPU</PlatformTarget>
     </PropertyGroup>
@@ -30,17 +36,17 @@
         <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     </PropertyGroup>
     
-    <ItemGroup Condition="$(RuntimeIdentifier) == 'win-x64' or $(RuntimeIdentifier) == ''">
+    <ItemGroup Condition="'$(IsWindows)'=='true'">
         <Content Include="..\external\fna-libs\x64\**" CopyToOutputDirectory="PreserveNewest"/>
         <Content Include="..\external\ImGui.NET\deps\cimgui\win-x64\cimgui.dll" CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
 
-    <ItemGroup Condition="$(RuntimeIdentifier) == 'linux-x64' or $(RuntimeIdentifier) == ''">
+    <ItemGroup Condition="'$(IsLinux)'=='true'">
         <Content Include="..\external\fna-libs\lib64\**" CopyToOutputDirectory="PreserveNewest"/>
         <Content Include="..\external\ImGui.NET\deps\cimgui\linux-x64\cimgui.so" CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
     
-    <ItemGroup Condition="$(RuntimeIdentifier) == 'osx-x64' or $(RuntimeIdentifier) == ''">
+    <ItemGroup Condition="'$(IsOSX)'=='true'">
         <Content Include="..\external\fna-libs\osx\**" CopyToOutputDirectory="PreserveNewest"/>
         <Content Include="..\external\ImGui.NET\deps\cimgui\osx\cimgui.dylib" CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
