@@ -36,7 +36,7 @@ public static class HttpClientExt
 
             await destination.WriteAsync(buffer, 0, bytesRead).ConfigureAwait(false);
             totalBytesRead += bytesRead;
-            progress?.Report((float)totalLength / totalBytesRead);
+            progress?.Report((float)totalBytesRead / totalLength);
         } while (true);
     }
 }

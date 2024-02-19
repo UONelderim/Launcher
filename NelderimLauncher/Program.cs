@@ -24,6 +24,10 @@ namespace Nelderim.Launcher
                 {
                     if (targetPath != null)
                     {
+                        if(File.Exists(targetPath))
+                        {
+                            File.Delete(targetPath);
+                        }
                         File.Copy(currentProcessPath, targetPath, true);
                         var process = new Process();
                         process.StartInfo.FileName = Path.GetFullPath(targetPath);

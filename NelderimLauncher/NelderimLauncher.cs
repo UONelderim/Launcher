@@ -36,6 +36,7 @@ namespace Nelderim.Launcher
             Window.AllowUserResizing = true;
             _downloadProgressHandler = new Progress<float>(f => _downloadProgressValue = f);
             Window.Title = $"Nelderim Launcher {Version}";
+            String.Join(' ', args);
         }
 
         protected override void Initialize()
@@ -174,7 +175,7 @@ namespace Nelderim.Launcher
             ImGui.Text("Nowa wersja: TODO");
             if (ImGui.Button("Aktualizuj"))
             {
-               new Task(AutoUpdate).Start();
+                AutoUpdate();
             }
             if (ImGui.Button("Pomin"))
             {
@@ -249,6 +250,10 @@ namespace Nelderim.Launcher
             var dir = Path.GetDirectoryName(currentPath);
             var filename = Path.GetFileName(currentPath);
             var newPath = $"{dir}/_{filename}";
+            if(File.Exists(newPath))
+            {
+                File.Delete(newPath);
+            }
             await using (var file = new FileStream(newPath, FileMode.OpenOrCreate))
             {
                 await HttpClient.DownloadDataAsync($"{PatchUrl}/{_autoUpdateInfos.First().Filename}",
@@ -257,8 +262,8 @@ namespace Nelderim.Launcher
             }
 
             var process = new Process();
-            process.StartInfo.FileName = newPath;
-            process.StartInfo.Arguments = $"autoupdate {currentPath}";
+            process.StartInfo.FileName = Path.GetFullPath(newPath);
+            process.StartInfo.Arguments = $"autoupdate {filename}";
             process.Start();
             Exit();
         }
