@@ -32,7 +32,7 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - name: Publish
-        run: dotnet publish NelderimLauncher -c Release -o release -p:DebugType=None -p:WarningLevel=0 -p:PublishSingleFile=true -p:SelfContained=false -p:IncludeAllContentForSelfExtract=true
+        run: dotnet publish NelderimLauncher -c Release -o release -p:DebugType=None -p:WarningLevel=0 -p:PublishSingleFile=true -p:SelfContained=false -p:IncludeAllContentForSelfExtract=true -p:RunnerOs=${{ runner.os}}
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:

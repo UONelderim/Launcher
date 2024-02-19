@@ -10,24 +10,6 @@
         <OutDir>..\output</OutDir>
     </PropertyGroup>
 
-    <PropertyGroup>
-        <IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</IsWindows>
-        <IsOSX Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</IsOSX>
-        <IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(IsWindows)' == 'true'">
-        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    </PropertyGroup>
-    
-    <PropertyGroup Condition="'$(IsLinux)' == 'true'">
-        <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
-    </PropertyGroup>
-    
-    <PropertyGroup Condition="'$(IsOSX)' == 'true'">
-        <RuntimeIdentifier>osx-x64</RuntimeIdentifier>
-    </PropertyGroup>
-    
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
       <PlatformTarget>AnyCPU</PlatformTarget>
     </PropertyGroup>
@@ -42,23 +24,23 @@
       <ProjectReference Include="..\Nelderim\Nelderim.csproj" />
     </ItemGroup>
     
-    <PropertyGroup Condition="$(RuntimeIdentifier) != ''"> <!-- publish -->
+    <PropertyGroup Condition="$(RunnerOs) != ''"> <!-- publish -->
         <PublishSingleFile>true</PublishSingleFile>
         <SelfContained>false</SelfContained>
         <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     </PropertyGroup>
     
-    <ItemGroup Condition="'$(IsWindows)' == 'true'">
+    <ItemGroup Condition="$(RuntimeIdentifier) == 'win-x64' or $(RuntimeIdentifier) == '' or $(RunnerOs) == 'Windows'">
         <Content Include="..\external\FNA-libs\x64\*"/>
         <Content Include="..\external\ImGui.NET\deps\cimgui\win-x64\cimgui.dll"/>
     </ItemGroup>
 
-    <ItemGroup Condition="'$(IsLinux)' == 'true'">
+    <ItemGroup Condition="$(RuntimeIdentifier) == 'linux-x64' or $(RuntimeIdentifier) == '' or $(RunnerOs) == 'Linux'">
         <Content Include="../external/FNA-libs/lib64/*"/>
         <Content Include="../external/ImGui.NET/deps/cimgui/linux-x64/cimgui.so"/>
     </ItemGroup>
     
-    <ItemGroup Condition="'$(IsOSX)' == 'true'">
+    <ItemGroup Condition="$(RuntimeIdentifier) == 'osx-x64' or $(RuntimeIdentifier) == '' or $(RunnerOs) == 'macOS'">
         <Content Include="../external/FNA-libs/osx/*"/>
         <Content Include="../external/ImGui.NET/deps/cimgui/osx/cimgui.dylib"/>
     </ItemGroup>
