@@ -1,32 +1,47 @@
-﻿using Avalonia;
-using Avalonia.ReactiveUI;
-using System;
-using Nelderim.Utility;
+﻿using System.Diagnostics;
 
-namespace NelderimLauncher
+namespace Nelderim.Launcher
 {
-    class Program
+    public static class Program
     {
-        private static FileLogger log = new(typeof(Program));
-
-        [STAThread]
         public static void Main(string[] args)
+        {
+            if (args.Length == 2 && args[0] == "autoupdate")
+            {
+                var targetPath = args[1];
+                AutoUpdate(targetPath);
+                return;
+            }
+            using (var game = new NelderimLauncher(args)) game.Run();
+        }
+
+        public static void AutoUpdate(string targetPath)
         {
             try
             {
-                BuildAvaloniaApp()
-                    .StartWithClassicDesktopLifetime(args);
+                var currentProcessPath = Environment.ProcessPath;
+                if (currentProcessPath != null)
+                {
+                    if (targetPath != null)
+                    {
+                        if(File.Exists(targetPath))
+                        {
+                            File.Delete(targetPath);
+                        }
+                        File.Copy(currentProcessPath, targetPath, true);
+                        var process = new Process();
+                        process.StartInfo.FileName = Path.GetFullPath(targetPath);
+                        process.StartInfo.Arguments = "Aktualizacja zakonczona pomyslnie";
+                        process.Start();
+                    }
+                }
             }
             catch (Exception e)
             {
-                log.Fatal(e.ToString());
+                Console.WriteLine(e);
+                Console.WriteLine("Press any key to continue");
+                Console.ReadKey();
             }
         }
-
-        public static AppBuilder BuildAvaloniaApp()
-            => AppBuilder.Configure<App>()
-                .UsePlatformDetect()
-                .LogToTrace()
-                .UseReactiveUI();
     }
 }

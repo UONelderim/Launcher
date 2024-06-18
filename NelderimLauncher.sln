@@ -1,10 +1,16 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NelderimLauncher", "NelderimLauncher\NelderimLauncher.csproj", "{374FFE06-725F-4772-B198-3836EBA409BB}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NelderimPatch", "NelderimPatch\NelderimPatch.csproj", "{76E207D9-F6A7-4C6E-B7CE-8CF573CCA6EF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nelderim", "Nelderim\Nelderim.csproj", "{EE443E2E-8879-48FF-A69E-7820D7722BCC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NelderimLauncher", "NelderimLauncher\NelderimLauncher.csproj", "{75E87374-2A49-4BCA-A60E-849AB735106C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FNA.Core", "external\FNA\FNA.Core.csproj", "{91451584-92E6-4EE3-9268-868E404A684A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImGui.NET", "external\ImGui.NET\src\ImGui.NET\ImGui.NET.csproj", "{7352CB11-04D0-434B-8CBE-49ECEC9C1800}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "external", "external", "{DB6CAD7A-8427-4E39-8A12-C82A708A22DE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -12,10 +18,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{374FFE06-725F-4772-B198-3836EBA409BB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{374FFE06-725F-4772-B198-3836EBA409BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{374FFE06-725F-4772-B198-3836EBA409BB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{374FFE06-725F-4772-B198-3836EBA409BB}.Release|Any CPU.Build.0 = Release|Any CPU
 		{76E207D9-F6A7-4C6E-B7CE-8CF573CCA6EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{76E207D9-F6A7-4C6E-B7CE-8CF573CCA6EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{76E207D9-F6A7-4C6E-B7CE-8CF573CCA6EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -24,5 +26,21 @@ Global
 		{EE443E2E-8879-48FF-A69E-7820D7722BCC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EE443E2E-8879-48FF-A69E-7820D7722BCC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EE443E2E-8879-48FF-A69E-7820D7722BCC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{75E87374-2A49-4BCA-A60E-849AB735106C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{75E87374-2A49-4BCA-A60E-849AB735106C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{75E87374-2A49-4BCA-A60E-849AB735106C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{75E87374-2A49-4BCA-A60E-849AB735106C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{91451584-92E6-4EE3-9268-868E404A684A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{91451584-92E6-4EE3-9268-868E404A684A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{91451584-92E6-4EE3-9268-868E404A684A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{91451584-92E6-4EE3-9268-868E404A684A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7352CB11-04D0-434B-8CBE-49ECEC9C1800}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7352CB11-04D0-434B-8CBE-49ECEC9C1800}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7352CB11-04D0-434B-8CBE-49ECEC9C1800}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7352CB11-04D0-434B-8CBE-49ECEC9C1800}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{91451584-92E6-4EE3-9268-868E404A684A} = {DB6CAD7A-8427-4E39-8A12-C82A708A22DE}
+		{7352CB11-04D0-434B-8CBE-49ECEC9C1800} = {DB6CAD7A-8427-4E39-8A12-C82A708A22DE}
 	EndGlobalSection
 EndGlobal
