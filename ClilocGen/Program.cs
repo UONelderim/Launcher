@@ -29,6 +29,11 @@ using (var writer = new BinaryWriter(new FileStream(targetEnu, FileMode.Create, 
             writer.Write(id);
             writer.Write((byte)0); //Flag, 0=original, 1=custom, 2=modified
             var utf8String = Encoding.UTF8.GetBytes(text);
+            if (utf8String.Length > ushort.MaxValue)
+            {
+                Console.WriteLine($"Entry too long: {id}");
+                Array.Resize(ref utf8String, ushort.MaxValue);
+            }
             writer.Write((ushort)utf8String.Length);
             writer.Write(utf8String);
             writtenCount++;
