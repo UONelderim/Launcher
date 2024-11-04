@@ -12,10 +12,12 @@ namespace Nelderim.Launcher
                 AutoUpdate(targetPath);
                 return;
             }
-            using (var game = new NelderimLauncher(args)) game.Run();
+
+            using var game = new NelderimLauncher(args);
+            game.Run();
         }
 
-        public static void AutoUpdate(string targetPath)
+        private static void AutoUpdate(string targetPath)
         {
             try
             {

@@ -10,7 +10,8 @@ public class ConfigRoot
 public static class Config
 {
     public static ConfigRoot Instance;
-    private static string _configFilePath = "NelderimLauncher.json";
+    //ProgramData for windows, /usr/share for unix
+    private static string _configFilePath = Environment.SpecialFolder.CommonApplicationData + Path.DirectorySeparatorChar + "NelderimLauncher.json";
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -19,14 +20,24 @@ public static class Config
     
     static Config()
     {
+        if (File.Exists(_configFilePath))
+        {
+            var jsonText = File.ReadAllText(_configFilePath);
+            try
+            {
+                Instance = JsonSerializer.Deserialize<ConfigRoot>(jsonText, SerializerOptions);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                File.Delete(_configFilePath);
+            }
+        }
         if (!File.Exists(_configFilePath))
         {
-            var newConfig = new ConfigRoot();
-            File.WriteAllText(_configFilePath, JsonSerializer.Serialize(newConfig));
+            Instance = new ConfigRoot();
+            Save();
         }
-
-        var jsonText = File.ReadAllText(_configFilePath);
-        Instance = JsonSerializer.Deserialize<ConfigRoot>(jsonText, SerializerOptions);
     }
 
     public static void Save()

@@ -5,16 +5,17 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <RootNamespace>NelderimPatchGen</RootNamespace>
+        <RootNamespace>Nelderim</RootNamespace>
         <LangVersion>12</LangVersion>
+        <AssemblyName>NelderimManifestUpdate</AssemblyName>
+        <PackageId>NelderimManifestUpdate</PackageId>
+        <Authors>Nelderim</Authors>
+        <Company>Nelderim</Company>
+        <Product>Nelderim</Product>
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Nelderim\Nelderim.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Update="NelderimPatch.conf.default">
+      <None Update="NelderimPatch.exclude.default">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
     </ItemGroup>

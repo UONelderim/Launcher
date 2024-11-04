@@ -4,7 +4,6 @@ using System.Text.Json;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Nelderim.Model;
 using Nelderim.Utility;
 using Num = System.Numerics;
 
@@ -13,18 +12,19 @@ namespace Nelderim.Launcher
     public class NelderimLauncher : Game
     {
         private const string Version = "1.1.0"; //Pass me from outside
-        private readonly HttpClient HttpClient = new();
+        private readonly HttpClient _HttpClient = new();
 
         private GraphicsDeviceManager _gdm;
-        private ImGuiRenderer _imGuiRenderer;
+        private ImGuiRenderer _ImGuiRenderer;
 
-        private Texture2D? _xnaTexture;
-        private IntPtr? _imGuiTexture;
+        private Texture2D? _XnaTexture;
+        private IntPtr? _ImGuiTexture;
 
-        private bool _updateAvailable;
+        private bool _UpdateAvailable;
 
-        private List<Patch> _autoUpdateInfos = new();
-        private List<PatchInfo> _patchInfos = new();
+        private Manifest _LocalManifest;
+        private Manifest _ServerManifest;
+        private List<FileInfo> _ChangedFiles;
 
         public NelderimLauncher(string[] args)
         {
@@ -35,22 +35,23 @@ namespace Nelderim.Launcher
             IsMouseVisible = true;
             Window.AllowUserResizing = true;
             _downloadProgressHandler = new Progress<float>(f => _downloadProgressValue = f);
+            
             Window.Title = $"Nelderim Launcher {Version}";
             String.Join(' ', args);
         }
 
         protected override void Initialize()
         {
-            _imGuiRenderer = new ImGuiRenderer(_gdm.GraphicsDevice);
-            _imGuiRenderer.RebuildFontAtlas();
-            _autoUpdateInfos = FetchAutoUpdateInfo();
-            _updateAvailable = IsUpdateAvailable();
+            _ImGuiRenderer = new ImGuiRenderer(_gdm.GraphicsDevice);
+            _ImGuiRenderer.RebuildFontAtlas();
+            // _autoUpdateInfos = FetchAutoUpdateInfo();
+            // _updateAvailable = IsUpdateAvailable();
             base.Initialize();
         }
 
         protected override void LoadContent()
         {
-            _xnaTexture = CreateTexture(GraphicsDevice,
+            _XnaTexture = CreateTexture(GraphicsDevice,
                 300,
                 150,
                 pixel =>
@@ -58,16 +59,16 @@ namespace Nelderim.Launcher
                     var red = pixel % 300 / 2;
                     return new Color(red, 1, 1);
                 });
-            _imGuiTexture = _imGuiRenderer.BindTexture(_xnaTexture);
+            _ImGuiTexture = _ImGuiRenderer.BindTexture(_XnaTexture);
             base.LoadContent();
         }
         
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.Black);
-            _imGuiRenderer.BeforeDraw(gameTime, IsActive);
+            _ImGuiRenderer.BeforeDraw(gameTime, IsActive);
             DrawUI();
-            _imGuiRenderer.AfterDraw();
+            _ImGuiRenderer.AfterDraw();
 
             base.Draw(gameTime);
         }
@@ -104,7 +105,7 @@ namespace Nelderim.Launcher
             if (ImGui.Begin("MainWindow",
                     ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings))
             {
-                if (_updateAvailable)
+                if (_UpdateAvailable)
                 {
                     DrawUpdateUI();
                 }
@@ -126,9 +127,9 @@ namespace Nelderim.Launcher
 
             ImGui.SameLine();
             ImGui.BeginDisabled(_refreshing);
-            if (ImGui.Button("Odswiez", new System.Numerics.Vector2(ImGui.GetContentRegionAvail().X, ButtonHeight)))
+            if (ImGui.Button("Odswiez", new Num.Vector2(ImGui.GetContentRegionAvail().X, ButtonHeight)))
             {
-                new Task(Refresh).Start();
+                new Task(CheckUpdate).Start();
             }
 
             ImGui.EndDisabled();
@@ -142,12 +143,11 @@ namespace Nelderim.Launcher
             {
                 if (ImGui.Button("Aktualizuj", size3))
                 {
-                    new Task(Patch).Start();
+                    new Task(Update).Start();
                 }
             }
             else
             {
-                var posY = ImGui.GetCursorPosY();
                 ImGui.ProgressBar(_downloadProgressValue, size3, "");
                 var text = $"{_downloadFileName} {_downloadProgressValue * 100f:F0}%";
                 var textSize = ImGui.CalcTextSize(text);
@@ -179,22 +179,36 @@ namespace Nelderim.Launcher
             }
             if (ImGui.Button("Pomin"))
             {
-                _updateAvailable = false;
+                _UpdateAvailable = false;
             }
         }
-        private async void Refresh()
+        private async void CheckUpdate()
         {
             _refreshing = true;
             try
             {
-                var response = await HttpClient.GetAsync($"{PatchUrl}/NelderimPatch.json");
+                var response = await _HttpClient.GetAsync($"{PatchUrl}/Nelderim.manifest.json");
                 var responseBody = await response.Content.ReadAsStringAsync();
-                var patches = JsonSerializer.Deserialize<List<Patch>>(responseBody);
-                _patchInfos = patches.ConvertAll(p => new PatchInfo(p)).FindAll(p => p.ShouldUpdate);
-                if (_patchInfos.Count > 0)
+                _ServerManifest = JsonSerializer.Deserialize<Manifest>(responseBody);
+                _ChangedFiles = _LocalManifest.ChangesBetween(_ServerManifest);
+                if(_ChangedFiles.Count > 0)
                 {
                     Log("Dostepne sa nowe aktualizacje!");
-                    _patchInfos.ForEach(p => Log(p.ToString()));
+                    foreach (var fileInfo in _ChangedFiles)
+                    {
+                        if (fileInfo.Version == -1)
+                        {
+                            Log("Usunieto " + fileInfo.File);
+                        }
+                        else if (fileInfo.Version == 1)
+                        {
+                            Log("Dodano " + fileInfo.File);
+                        }
+                        else
+                        {
+                            Log("Zaktualizowano " + fileInfo.File);
+                        }
+                    }
                 }
                 else
                 {
@@ -214,20 +228,28 @@ namespace Nelderim.Launcher
 
         private Progress<float> _downloadProgressHandler;
 
-        private async void Patch()
+        private async void Update()
         {
             _downloading = true;
             try
             {
-                foreach (var info in _patchInfos)
+                foreach (var fileInfo in _ChangedFiles)
                 {
-                    Log($"Pobieram {info.Filename}");
-                    _downloadFileName = info.Filename;
-                    File.Delete(info.Filename);
-                    using var file = new FileStream(Path.GetFullPath(info.Filename), FileMode.OpenOrCreate);
-                    await HttpClient.DownloadDataAsync($"{PatchUrl}/{info.Filename}", file, _downloadProgressHandler);
+                    if (fileInfo.Version != -1)
+                    {
+                        Log($"Pobieram {fileInfo.File}");
+                        _downloadFileName = fileInfo.File;
+                        File.Delete(fileInfo.File);
+                        using var file = new FileStream(Path.GetFullPath(fileInfo.File), FileMode.OpenOrCreate);
+                        await _HttpClient.DownloadDataAsync($"{PatchUrl}/Nelderim/{fileInfo.File}", //TODO: How to pass 'Nelderim' here?
+                            file,
+                            _downloadProgressHandler);
+                    }
+                    else
+                    {
+                        //TODO: Usun plik
+                    }
                 }
-
                 Log("Wszystkie pliki sa aktualne");
             }
             catch (Exception e)
@@ -237,51 +259,52 @@ namespace Nelderim.Launcher
             finally
             {
                 _downloading = false;
-                _patchInfos = new();
+                _ChangedFiles = [];
                 _downloadProgressValue = 0f;
                 _downloadFileName = "";
                 _downloading = false;
             }
         }
         
-        private async void AutoUpdate()
-        {
-            var currentPath = Environment.ProcessPath;
-            var dir = Path.GetDirectoryName(currentPath);
-            var filename = Path.GetFileName(currentPath);
-            var newPath = $"{dir}/_{filename}";
-            if(File.Exists(newPath))
-            {
-                File.Delete(newPath);
-            }
-            await using (var file = new FileStream(newPath, FileMode.OpenOrCreate))
-            {
-                await HttpClient.DownloadDataAsync($"{PatchUrl}/{_autoUpdateInfos.First().Filename}",
-                    file,
-                    _downloadProgressHandler);
-            }
-
-            var process = new Process();
-            process.StartInfo.FileName = Path.GetFullPath(newPath);
-            process.StartInfo.Arguments = $"autoupdate {filename}";
-            process.Start();
-            Exit();
-        }
-
         private bool IsUpdateAvailable()
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return false;
-            
-            using FileStream stream = File.OpenRead(Environment.ProcessPath ?? "");
-            return Crypto.Sha1Hash(stream) != _autoUpdateInfos.First().Sha1;
+            // if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return false;
+            // return Utils.Sha1Hash(Environment.ProcessPath ?? "") != _ServerManifest.First().Sha1;
+            return false;
         }
 
-        private List<Patch> FetchAutoUpdateInfo()
+        private Manifest FetchAutoUpdateInfo()
         {
-            var patchUrl = Config.Instance.PatchUrl;
-            var patchJson = HttpClient.GetAsync($"{patchUrl}/Nelderim.json").Result.Content.ReadAsStream();
-            return JsonSerializer.Deserialize<List<Patch>>(patchJson);
+            // var patchUrl = Config.Instance.PatchUrl;
+            // var patchJson = _HttpClient.GetAsync($"{patchUrl}/NelderimLauncher.manifest.json").Result.Content.ReadAsStream();
+            // return JsonSerializer.Deserialize<List<Patch>>(patchJson);
+            return null;
         }
+        
+        private async void AutoUpdate()
+        {
+            // var currentPath = Environment.ProcessPath;
+            // var dir = Path.GetDirectoryName(currentPath);
+            // var filename = Path.GetFileName(currentPath);
+            // var newPath = $"{dir}/_{filename}";
+            // if(File.Exists(newPath))
+            // {
+            //     File.Delete(newPath);
+            // }
+            // await using (var file = new FileStream(newPath, FileMode.OpenOrCreate))
+            // {
+            //     await _HttpClient.DownloadDataAsync($"{PatchUrl}/{_ServerManifest.First().File}",
+            //         file,
+            //         _downloadProgressHandler);
+            // }
+            //
+            // var process = new Process();
+            // process.StartInfo.FileName = Path.GetFullPath(newPath);
+            // process.StartInfo.Arguments = $"autoupdate {filename}";
+            // process.Start();
+            // Exit();
+        }
+
         
         private void Log(string text)
         {
