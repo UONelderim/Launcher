@@ -23,6 +23,11 @@
       <ProjectReference Include="..\external\ImGui.NET\src\ImGui.NET\ImGui.NET.csproj" />
       <ProjectReference Include="..\NelderimManifestUpdate\NelderimManifestUpdate.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="background.png" />
+        <EmbeddedResource Include="launch.png" />
+    </ItemGroup>
     
     <PropertyGroup Condition="$(RuntimeIdentifier) != '' or $(RunnerOs) != ''"> <!-- publish -->
         <PublishSingleFile>true</PublishSingleFile>

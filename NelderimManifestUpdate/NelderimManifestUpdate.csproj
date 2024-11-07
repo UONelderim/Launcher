@@ -15,7 +15,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <None Update="NelderimPatch.exclude.default">
+      <None Update="NelderimManifestUpdate.exclude.default">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
     </ItemGroup>

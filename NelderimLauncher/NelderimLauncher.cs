@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Text.Json;
+﻿using System.Text.Json;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -12,13 +10,14 @@ namespace Nelderim.Launcher
     public class NelderimLauncher : Game
     {
         private const string Version = "1.1.0"; //Pass me from outside
+        private const string MANIFEST_FILE_NAME = "Nelderim.manifest.json";
         private readonly HttpClient _HttpClient = new();
 
         private GraphicsDeviceManager _gdm;
         private ImGuiRenderer _ImGuiRenderer;
 
-        private Texture2D? _XnaTexture;
-        private IntPtr? _ImGuiTexture;
+        private IntPtr? _BackgroundTexture;
+        private IntPtr? _LaunchTexture;
 
         private bool _UpdateAvailable;
 
@@ -30,11 +29,11 @@ namespace Nelderim.Launcher
         {
             _gdm = new GraphicsDeviceManager(this);
             _gdm.PreferredBackBufferWidth = 600;
-            _gdm.PreferredBackBufferHeight = 300;
+            _gdm.PreferredBackBufferHeight = 400;
             _gdm.PreferMultiSampling = true;
             IsMouseVisible = true;
-            Window.AllowUserResizing = true;
-            _downloadProgressHandler = new Progress<float>(f => _downloadProgressValue = f);
+            Window.AllowUserResizing = false;
+            _downloadProgressHandler = new Progress<float>(f => _DownloadProgressValue = f);
             
             Window.Title = $"Nelderim Launcher {Version}";
             String.Join(' ', args);
@@ -44,6 +43,17 @@ namespace Nelderim.Launcher
         {
             _ImGuiRenderer = new ImGuiRenderer(_gdm.GraphicsDevice);
             _ImGuiRenderer.RebuildFontAtlas();
+            ImGui.StyleColorsDark();
+            if(File.Exists(MANIFEST_FILE_NAME))
+            {
+                var jsonText = File.ReadAllText(MANIFEST_FILE_NAME);
+                _LocalManifest = JsonSerializer.Deserialize<Manifest>(jsonText);
+            }
+            else
+            {
+                _LocalManifest = new Manifest(0, []);
+            }
+            //TODO: Bring me back
             // _autoUpdateInfos = FetchAutoUpdateInfo();
             // _updateAvailable = IsUpdateAvailable();
             base.Initialize();
@@ -51,15 +61,8 @@ namespace Nelderim.Launcher
 
         protected override void LoadContent()
         {
-            _XnaTexture = CreateTexture(GraphicsDevice,
-                300,
-                150,
-                pixel =>
-                {
-                    var red = pixel % 300 / 2;
-                    return new Color(red, 1, 1);
-                });
-            _ImGuiTexture = _ImGuiRenderer.BindTexture(_XnaTexture);
+            _BackgroundTexture = _ImGuiRenderer.BindTexture(Texture2D.FromStream(_gdm.GraphicsDevice, GetType().Assembly.GetManifestResourceStream("NelderimLauncher.background.png")));
+            _LaunchTexture = _ImGuiRenderer.BindTexture(Texture2D.FromStream(_gdm.GraphicsDevice, GetType().Assembly.GetManifestResourceStream("NelderimLauncher.launch.png")));
             base.LoadContent();
         }
         
@@ -73,35 +76,27 @@ namespace Nelderim.Launcher
             base.Draw(gameTime);
         }
         
-        //We can later use this for displaying graphics
-        private Texture2D CreateTexture(GraphicsDevice device, int width, int height, Func<int, Color> paint)
-        {
-            var texture = new Texture2D(device, width, height);
-            Color[] data = new Color[width * height];
-            for (var pixel = 0; pixel < data.Length; pixel++)
-            {
-                data[pixel] = paint(pixel);
-            }
-            texture.SetData(data);
-            return texture;
-        }
+        private bool _ShowDebugWindow;
 
-        private bool _showDebugWindow;
-        private string _logText = "";
-        private bool _refreshing;
-        private bool _downloading;
-        private string _downloadFileName = "";
-        private float _downloadProgressValue;
+        private bool _ShowLogs;
+        private bool _ShowOptions;
+        
+        private string _LogText = "";
+        private string _LastLogMessage = "";
+        private bool _Refreshing;
+        private bool _Downloading;
+        private string _DownloadFileName = "";
+        private float _DownloadProgressValue;
         private string PatchUrl => Config.Instance.PatchUrl;
-
-        private const int ButtonHeight = 40;
 
         private void DrawUI()
         {
+            var padding = _ShowOptions || _ShowLogs ? new Num.Vector2(8, 8) : new Num.Vector2(0, 0);
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, padding);
+            DrawMainMenu();
             var viewport = ImGui.GetMainViewport();
             ImGui.SetNextWindowPos(viewport.WorkPos);
             ImGui.SetNextWindowSize(viewport.WorkSize);
-
             if (ImGui.Begin("MainWindow",
                     ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings))
             {
@@ -109,63 +104,116 @@ namespace Nelderim.Launcher
                 {
                     DrawUpdateUI();
                 }
+                else if (_ShowLogs)
+                {
+                    DrawLogsUI();
+                }
+                else if (_ShowOptions)
+                {
+                    DrawOptionsUI();
+                }
                 else
                 {
                     DrawMainUI();
                 }
+                ImGui.End();
             }
-
-            ImGui.End();
+            if (_ShowDebugWindow)
+            {
+                ImGui.SetNextWindowPos(new Num.Vector2(650, 20), ImGuiCond.FirstUseEver);
+                ImGui.ShowDemoWindow(ref _ShowDebugWindow);
+            }
+            if (ImGui.IsKeyPressed(ImGuiKey.F12))
+            {
+                _ShowDebugWindow = !_ShowDebugWindow;
+            }
+            ImGui.PopStyleVar();
         }
 
+        private void DrawMainMenu()
+        {
+            if (ImGui.BeginMainMenuBar())
+            {
+                if (ImGui.MenuItem("Logi", "", _ShowLogs))
+                {
+                    _ShowLogs = !_ShowLogs;
+                    _ShowOptions = false;
+                }
+                if (ImGui.MenuItem("Opcje", "", _ShowOptions))
+                {
+                    _ShowLogs = false;
+                    _ShowOptions = !_ShowOptions;
+                }
+                ImGui.EndMainMenuBar();
+            }
+        }
+
+        Num.Vector4 buttonTintColor = new Num.Vector4(1f, 1f, 1f, 1);
+        
         private void DrawMainUI()
         {
-            if (ImGui.InputText("", ref Config.Instance.PatchUrl, 256))
+            var availSize = ImGui.GetContentRegionAvail();
+            var cursorPos = ImGui.GetCursorPos();
+            ImGui.Image(_BackgroundTexture.Value, availSize);
+            ImGui.SetCursorPos(cursorPos);
+            //Header
+            ImGui.Dummy(new Num.Vector2(availSize.X, availSize.Y * 0.45f));
+            //Run button
+            ImGui.SetCursorPosX(availSize.X * 0.375f);
+            var launchSize = new Num.Vector2(availSize.X * 0.25f, availSize.Y * 0.25f);
+            ImGui.PushStyleColor(ImGuiCol.Button, new Num.Vector4(0.5f, 0.5f, 0.5f, 1));
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Num.Vector4(0.8f, 0.8f, 0.8f, 1));
+            if (ImGui.ImageButton("Uruchom", _LaunchTexture.Value, launchSize))
+            {
+                // Run Game
+            }
+            ImGui.PopStyleColor(2);
+            ImGui.EndDisabled();
+            //Spacing
+            ImGui.Dummy(new Num.Vector2(availSize.X, availSize.Y * 0.1f));
+            //Status text
+            ImGui.SetCursorPosX(availSize.X * 0.5f - ImGui.CalcTextSize(_LastLogMessage).X * 0.5f);
+            ImGui.PushStyleColor(ImGuiCol.Text, new Num.Vector4(0,0,0,1));
+            ImGui.TextUnformatted(_LastLogMessage);
+            ImGui.PopStyleColor();
+            //Progress bar
+            var progressBarStart = ImGui.GetCursorPos();
+            var bottomAvailSize = ImGui.GetContentRegionAvail();
+            var progressBarSize = new Num.Vector2(bottomAvailSize.X * 0.9f, bottomAvailSize.Y * 0.6f);
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + bottomAvailSize.X * 0.05f );
+            ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 5);
+            ImGui.ProgressBar(_DownloadProgressValue, progressBarSize, "");
+            ImGui.PopStyleVar();
+            var text = $"{_DownloadFileName} {_DownloadProgressValue * 100f:F0}%";
+            var textSize = ImGui.CalcTextSize(text);
+            ImGui.SetCursorPosX(availSize.X / 2 - textSize.X / 2);
+            ImGui.SetCursorPosY(progressBarStart.Y + progressBarSize.Y * 0.5f - textSize.Y * 0.5f);
+            ImGui.TextUnformatted(text);
+        }
+
+        private void DrawOptionsUI()
+        {
+            if (ImGui.InputText("Patch Url", ref Config.Instance.PatchUrl, 256))
             {
                 Config.Save();
             }
-
-            ImGui.SameLine();
-            ImGui.BeginDisabled(_refreshing);
-            if (ImGui.Button("Odswiez", new Num.Vector2(ImGui.GetContentRegionAvail().X, ButtonHeight)))
+            if (ImGui.InputText("Ultima Online Directory", ref Config.Instance.GamePath, 256))
+            {
+                Config.Save();
+            }
+            ImGui.BeginDisabled(_Refreshing);
+            if (ImGui.MenuItem("Sprawdz aktualizacje"))
             {
                 new Task(CheckUpdate).Start();
             }
-
             ImGui.EndDisabled();
-            var size2 = ImGui.GetContentRegionAvail();
-            size2.Y -= ButtonHeight;
-            ImGui.BeginChild("Log", size2, ImGuiChildFlags.Border);
-            ImGui.TextUnformatted(_logText);
+        }
+
+        private void DrawLogsUI()
+        {
+            ImGui.BeginChild("Log", ImGui.GetContentRegionAvail(), ImGuiChildFlags.Border);
+            ImGui.TextUnformatted(_LogText);
             ImGui.EndChild();
-            var size3 = ImGui.GetContentRegionAvail();
-            if (!_downloading)
-            {
-                if (ImGui.Button("Aktualizuj", size3))
-                {
-                    new Task(Update).Start();
-                }
-            }
-            else
-            {
-                ImGui.ProgressBar(_downloadProgressValue, size3, "");
-                var text = $"{_downloadFileName} {_downloadProgressValue * 100f:F0}%";
-                var textSize = ImGui.CalcTextSize(text);
-                ImGui.SetCursorPosX(size3.X / 2 - textSize.X / 2);
-                ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ButtonHeight / 2 - textSize.Y / 2);
-                ImGui.TextUnformatted(text);
-            }
-
-            if (_showDebugWindow)
-            {
-                ImGui.SetNextWindowPos(new Num.Vector2(650, 20), ImGuiCond.FirstUseEver);
-                ImGui.ShowDemoWindow(ref _showDebugWindow);
-            }
-
-            if (ImGui.IsKeyPressed(ImGuiKey.F12))
-            {
-                _showDebugWindow = !_showDebugWindow;
-            }
         }
 
         private void DrawUpdateUI()
@@ -184,7 +232,7 @@ namespace Nelderim.Launcher
         }
         private async void CheckUpdate()
         {
-            _refreshing = true;
+            _Refreshing = true;
             try
             {
                 var response = await _HttpClient.GetAsync($"{PatchUrl}/Nelderim.manifest.json");
@@ -221,7 +269,7 @@ namespace Nelderim.Launcher
             }
             finally
             {
-                _refreshing = false;
+                _Refreshing = false;
             }
         }
 
@@ -230,7 +278,7 @@ namespace Nelderim.Launcher
 
         private async void Update()
         {
-            _downloading = true;
+            _Downloading = true;
             try
             {
                 foreach (var fileInfo in _ChangedFiles)
@@ -238,19 +286,26 @@ namespace Nelderim.Launcher
                     if (fileInfo.Version != -1)
                     {
                         Log($"Pobieram {fileInfo.File}");
-                        _downloadFileName = fileInfo.File;
-                        File.Delete(fileInfo.File);
-                        using var file = new FileStream(Path.GetFullPath(fileInfo.File), FileMode.OpenOrCreate);
+                        _DownloadFileName = fileInfo.File;
+                        if(File.Exists(fileInfo.File))
+                            File.Delete(fileInfo.File);
+                        var directory = Path.GetDirectoryName(fileInfo.File);
+                        if(directory != null)
+                            Directory.CreateDirectory(directory);
+                        await using var file = new FileStream(Path.GetFullPath(fileInfo.File), FileMode.OpenOrCreate);
                         await _HttpClient.DownloadDataAsync($"{PatchUrl}/Nelderim/{fileInfo.File}", //TODO: How to pass 'Nelderim' here?
                             file,
                             _downloadProgressHandler);
                     }
                     else
                     {
-                        //TODO: Usun plik
+                        if(File.Exists(fileInfo.File))
+                            File.Delete(fileInfo.File);
                     }
                 }
                 Log("Wszystkie pliki sa aktualne");
+                _LocalManifest = _ServerManifest;
+                await File.WriteAllTextAsync(MANIFEST_FILE_NAME, JsonSerializer.Serialize(_LocalManifest));
             }
             catch (Exception e)
             {
@@ -258,11 +313,11 @@ namespace Nelderim.Launcher
             }
             finally
             {
-                _downloading = false;
+                _Downloading = false;
                 _ChangedFiles = [];
-                _downloadProgressValue = 0f;
-                _downloadFileName = "";
-                _downloading = false;
+                _DownloadProgressValue = 0f;
+                _DownloadFileName = "";
+                _Downloading = false;
             }
         }
         
@@ -308,7 +363,8 @@ namespace Nelderim.Launcher
         
         private void Log(string text)
         {
-            _logText += text + "\n";
+            _LastLogMessage = text;
+            _LogText += text + "\n";
         }
     }
 }

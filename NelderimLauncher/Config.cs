@@ -4,6 +4,7 @@ namespace Nelderim.Launcher;
 
 public class ConfigRoot
 {
+    public string GamePath = "";
     public string PatchUrl = "https://www.nelderim.pl/patch";
 }
 
