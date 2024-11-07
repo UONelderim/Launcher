@@ -59,6 +59,7 @@ namespace Nelderim.Launcher
             };
 
             var io = ImGui.GetIO();
+            io.ConfigInputTrickleEventQueue = false;
 
             TextInputEXT.TextInput += c =>
             {
@@ -101,10 +102,14 @@ namespace Nelderim.Launcher
             _loadedTextures.Remove(textureId);
         }
 
-        public virtual void BeforeDraw(GameTime gameTime, bool active)
+        public void Update(GameTime gameTime, bool active)
         {
             ImGui.GetIO().DeltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
             UpdateInput(active);
+        }
+        
+        public virtual void BeforeDraw()
+        {
             ImGui.NewFrame();
         }
 
@@ -133,13 +138,13 @@ namespace Nelderim.Launcher
 
         protected virtual void UpdateInput(bool active)
         {
-            if (!active) return;
             
             var io = ImGui.GetIO();
 
             var mouse = Mouse.GetState();
             var keyboard = Keyboard.GetState();
             io.AddMousePosEvent(mouse.X, mouse.Y);
+            if (!active) return;
             io.AddMouseButtonEvent(0, mouse.LeftButton == ButtonState.Pressed);
             io.AddMouseButtonEvent(1, mouse.RightButton == ButtonState.Pressed);
             io.AddMouseButtonEvent(2, mouse.MiddleButton == ButtonState.Pressed);

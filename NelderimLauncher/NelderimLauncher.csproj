@@ -27,6 +27,9 @@
     <ItemGroup>
         <EmbeddedResource Include="background.png" />
         <EmbeddedResource Include="launch.png" />
+        <EmbeddedResource Include="www.png" />
+        <EmbeddedResource Include="discord.png" />
+        <EmbeddedResource Include="logo.png" />
     </ItemGroup>
     
     <PropertyGroup Condition="$(RuntimeIdentifier) != '' or $(RunnerOs) != ''"> <!-- publish -->
