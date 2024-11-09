@@ -211,6 +211,7 @@ namespace Nelderim.Launcher
                 Keys.Scroll => ImGuiKey.ScrollLock,
                 Keys.LeftShift => ImGuiKey.ModShift,
                 Keys.LeftControl => ImGuiKey.ModCtrl,
+                Keys.RightControl => ImGuiKey.RightCtrl,
                 Keys.LeftAlt => ImGuiKey.ModAlt,
                 Keys.OemSemicolon => ImGuiKey.Semicolon,
                 Keys.OemPlus => ImGuiKey.Equal,
