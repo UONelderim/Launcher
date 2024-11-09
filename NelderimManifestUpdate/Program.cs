@@ -7,6 +7,7 @@ public class Program
 {
     public static void Main(string[] args)
     {
+        var entryPoint = args.FirstOrDefault("Nelderim/ClassicUO/ClassicUO.exe");
         var workDir = args.FirstOrDefault("Nelderim");
         var manifestPath = $"{workDir}.manifest.json";
         var oldManifestPath = $"{manifestPath}.old";
@@ -19,9 +20,8 @@ public class Program
             .Select(s => s.Replace(Path.DirectorySeparatorChar, '/')) //Normalize to unix style
             .Where(f => !excludes.Any(f.StartsWith)) //Exclude based on prefix
             .Order();
-
-
-        var currentManifest = new Manifest(0, []);
+        
+        var currentManifest = new Manifest(0, [], entryPoint);
         if (File.Exists(manifestPath))
         {
             using var currentManifestStream = File.OpenRead(manifestPath);
@@ -41,7 +41,7 @@ public class Program
             return new FileInfo(newFileName, newVersion, newSha);
         }).ToArray();
 
-        var newManifest = new Manifest(currentManifest.Version + 1, fileInfos);
+        var newManifest = new Manifest(currentManifest.Version + 1, fileInfos, entryPoint);
 
         using var newManifestStream = File.OpenWrite(manifestPath);
         JsonSerializer.Serialize(newManifestStream, newManifest);

@@ -1,7 +1,9 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Text.Json;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using NativeFileDialogSharp;
 using Nelderim.Utility;
 using Num = System.Numerics;
 
@@ -41,7 +43,6 @@ namespace Nelderim.Launcher
             _downloadProgressHandler = new Progress<float>(f => _DownloadProgressValue = f);
             
             Window.Title = $"Nelderim Launcher {Version}";
-            String.Join(' ', args);
         }
 
         protected override void Initialize()
@@ -56,8 +57,9 @@ namespace Nelderim.Launcher
             }
             else
             {
-                _LocalManifest = new Manifest(0, []);
+                _LocalManifest = new Manifest(0, [], "");
             }
+            
             //TODO: Bring me back
             // _autoUpdateInfos = FetchAutoUpdateInfo();
             // _updateAvailable = IsUpdateAvailable();
@@ -98,6 +100,7 @@ namespace Nelderim.Launcher
         }
         
         private bool _ShowDebugWindow;
+        private bool _ShowCompositionGuides;
 
         private bool _ShowLogs;
         private bool _ShowOptions;
@@ -109,17 +112,20 @@ namespace Nelderim.Launcher
         private string _DownloadFileName = "";
         private float _DownloadProgressValue;
         private string PatchUrl => Config.Instance.PatchUrl;
+        private DialogResult? _DialogResult;
 
         private void DrawUI()
         {
-            var padding = _ShowOptions || _ShowLogs ? new Num.Vector2(8, 8) : new Num.Vector2(0, 0);
-            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, padding);
             var viewport = ImGui.GetMainViewport();
             ImGui.SetNextWindowPos(viewport.WorkPos);
             ImGui.SetNextWindowSize(viewport.WorkSize);
             if (ImGui.Begin("MainWindow",
                     ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings))
             {
+                if(Config.Instance.GamePath == "")
+                {
+                    ImGui.OpenPopup("GamePathPopup");
+                }
                 if (_UpdateAvailable)
                 {
                     DrawUpdateUI();
@@ -136,6 +142,32 @@ namespace Nelderim.Launcher
                 {
                     DrawMainUI();
                 }
+                
+                if (ImGui.BeginPopupModal("GamePathPopup"))
+                {
+                    if (_DialogResult != null)
+                    {
+                        if(_DialogResult.IsOk)
+                        {
+                            Config.Instance.GamePath = _DialogResult.Path;
+                            Config.Save();
+                        }
+                        _DialogResult = null;
+                    }
+                    ImGui.Text("Podaj sciezke gdzie zainstalowac Nelderim");
+                    ImGui.InputText("##popup1", ref Config.Instance.GamePath, 512);
+                    ImGui.SameLine();
+                    if (ImGui.Button("..."))
+                    {
+                        _DialogResult = Dialog.FolderPicker();
+                    }
+                    if (ImGui.Button("OK"))
+                    {
+                        Config.Save();
+                        ImGui.CloseCurrentPopup();
+                    }
+                    ImGui.EndPopup();
+                }
                 ImGui.End();
             }
             if (_ShowDebugWindow)
@@ -147,24 +179,34 @@ namespace Nelderim.Launcher
             {
                 _ShowDebugWindow = !_ShowDebugWindow;
             }
+
+            if (ImGui.IsKeyPressed(ImGuiKey.F11))
+            {
+                _ShowCompositionGuides = !_ShowCompositionGuides;
+            }
             ImGui.PopStyleVar();
         }
         
         private void DrawMainUI()
         {
+            var viewport = ImGui.GetMainViewport();
+            var minPos = ImGui.GetCursorStartPos();
+            var maxPos = ImGui.GetContentRegionMax();
+            
+            //Style
             ImGui.PushStyleColor(ImGuiCol.Button, new Num.Vector4(0.5f, 0.5f, 0.5f, 1));
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Num.Vector4(0.8f, 0.8f, 0.8f, 1));
             ImGui.PushStyleColor(ImGuiCol.ButtonActive, Constants.NelderimColor);
             ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Num.Vector2(2, 2));
             ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 5);
-            var fakePadding = new Num.Vector2(12, 12);
             
-            var availSpace = ImGui.GetContentRegionAvail();
-            ImGui.Image(_BackgroundTexture, availSpace);
+            //Background
+            ImGui.PushClipRect(Num.Vector2.Zero, viewport.WorkSize, false);
+            ImGui.GetWindowDrawList().AddImage(_BackgroundTexture, Num.Vector2.Zero, viewport.WorkSize);
+            ImGui.PopClipRect();
             
-            ImGui.SetCursorPos(fakePadding);
-            var squareImageButtonSize = new Num.Vector2(availSpace.X * 0.08f, availSpace.X * 0.08f);
-            
+            //TopLeftButtons
+            var squareImageButtonSize = new Num.Vector2(maxPos.X * 0.08f, maxPos.X * 0.08f);
             ImGui.PushStyleColor(ImGuiCol.Button, new Num.Vector4(0.1f, 0.1f, 0.1f, 0.5f));
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Num.Vector4(0.2f, 0.2f, 0.2f, 0.5f));
             if (ImGui.ImageButton("Discord", _DiscordTexture, squareImageButtonSize))
@@ -177,12 +219,12 @@ namespace Nelderim.Launcher
                 Browser.Open("https://nelderim.pl/");
             }
             ImGui.PopStyleColor(2);
+            
             //TopRight Buttons 
             ImGui.SameLine();
             var squareButtonSize = squareImageButtonSize + ImGui.GetStyle().FramePadding * 2;
             var style = ImGui.GetStyle();
-            ImGui.SetCursorPosX(availSpace.X - style.WindowPadding.X - squareButtonSize.X * 2 - style.ItemSpacing.X - fakePadding.X);
-            // ImGui.BeginGroup();
+            ImGui.SetCursorPosX(maxPos.X - squareButtonSize.X * 2 - style.ItemSpacing.X );
             if(ImGui.Button("Opcje", squareButtonSize))
             {
                 _ShowOptions = true;
@@ -194,35 +236,42 @@ namespace Nelderim.Launcher
                 _ShowOptions = false;
                 _ShowLogs = true;
             }
-            // ImGui.EndGroup();
+            
             //Logo
             ImGui.SameLine();
             var imageSize = new Num.Vector2(_LoadedTextures["logo"].Bounds.Width, _LoadedTextures["logo"].Bounds.Height) * 0.35f;
-            ImGui.SetCursorPosX(availSpace.X / 2 - imageSize.X / 2);
+            ImGui.SetCursorPosX(maxPos.X / 2 - imageSize.X / 2);
             ImGui.SetCursorPosY(30);
             ImGui.Image(_LogoTexture, imageSize);
+            
             //Spacing
-            ImGui.Dummy(new Num.Vector2(availSpace.X, availSpace.Y * 0.35f));
+            ImGui.Dummy(new Num.Vector2(maxPos.X, maxPos.Y * 0.35f));
+            
             //Run button
-            ImGui.SetCursorPosX(availSpace.X * 0.375f);
+            ImGui.SetCursorPosX(maxPos.X * 0.375f);
             var launchPos = ImGui.GetCursorPos();
-            var launchSize = new Num.Vector2(availSpace.X * 0.25f, availSpace.Y * 0.25f);
+            var launchSize = new Num.Vector2(maxPos.X * 0.25f, maxPos.Y * 0.25f);
             ImGui.Dummy(launchSize);
-            var launchTint = ImGui.IsItemHovered() ? new Num.Vector4(1, 1, 1, 1) : new Num.Vector4(0.6f, 0.6f, 0.6f, 1);
             ImGui.SetCursorPos(launchPos);
             ImGui.PushStyleColor(ImGuiCol.Button, Num.Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Num.Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.ButtonActive, Num.Vector4.Zero);
+            var canRun = !string.IsNullOrEmpty(_LocalManifest.EntryPoint);
+            var launchTint = canRun && ImGui.IsItemHovered() ? new Num.Vector4(1, 1, 1, 1) : new Num.Vector4(0.6f, 0.6f, 0.6f, 1);
+            ImGui.BeginDisabled(!canRun);
             if (ImGui.ImageButton("Uruchom", _LaunchTexture, launchSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, launchTint))
             {
-                // Run Game
+                Process.Start( _LocalManifest.EntryPoint);
+                Exit();
             }
             ImGui.PopStyleColor(3);
             ImGui.EndDisabled();
+            
             //Spacing
-            ImGui.Dummy(new Num.Vector2(availSpace.X, availSpace.Y * 0.01f));
+            ImGui.Dummy(new Num.Vector2(maxPos.X, maxPos.Y * 0.01f));
+            
             //Status text
-            ImGui.SetCursorPosX(availSpace.X * 0.5f - ImGui.CalcTextSize(_LastLogMessage).X * 0.5f);
+            ImGui.SetCursorPosX(maxPos.X * 0.5f - ImGui.CalcTextSize(_LastLogMessage).X * 0.5f);
             var textPos = ImGui.GetCursorPos();
             var textSize = ImGui.CalcTextSize(_LastLogMessage);
             //Text background
@@ -232,11 +281,13 @@ namespace Nelderim.Launcher
                     textPos + textSize + Num.Vector2.One,
                     ImGui.GetColorU32(new Num.Vector4(1f, 1f, 1f, 0.6f)));
             }
-            //Actual text
+            
+            //Status text
             ImGui.SetCursorPos(textPos);
             ImGui.PushStyleColor(ImGuiCol.Text, new Num.Vector4(0,0,0,1));
             ImGui.TextUnformatted(_LastLogMessage);
             ImGui.PopStyleColor();
+            
             //Progress bar
             var progressBarStart = ImGui.GetCursorPos();
             var bottomAvailSize = ImGui.GetContentRegionAvail();
@@ -248,13 +299,26 @@ namespace Nelderim.Launcher
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, Constants.NelderimColor);//FilledColor
             ImGui.ProgressBar(0.4f, progressBarSize, "");
             ImGui.PopStyleVar(2);
+            
+            //Progress bar text
             var text = $"{_DownloadFileName} {_DownloadProgressValue * 100f:F0}%";
             var progressBarTextSize = ImGui.CalcTextSize(text);
-            ImGui.SetCursorPosX(availSpace.X / 2 - progressBarTextSize.X / 2);
+            ImGui.SetCursorPosX(maxPos.X / 2 - progressBarTextSize.X / 2);
             ImGui.SetCursorPosY(progressBarStart.Y + progressBarSize.Y * 0.5f - progressBarTextSize.Y * 0.5f);
             ImGui.TextUnformatted(text);
             ImGui.PopStyleVar();
             ImGui.PopStyleColor(3);
+
+            if (_ShowCompositionGuides)
+            {
+                var list = ImGui.GetWindowDrawList();
+                
+                list.AddRect(minPos, maxPos, 0xff0000ff);
+                list.AddLine(new Num.Vector2(minPos.X, maxPos.Y * 0.333f), new Num.Vector2(maxPos.X, maxPos.Y * 0.333f), 0xff00ffff);
+                list.AddLine(new Num.Vector2(minPos.X, maxPos.Y * 0.667f), new Num.Vector2(maxPos.X, maxPos.Y * 0.667f), 0xff00ffff);
+                list.AddLine(new Num.Vector2(maxPos.X * 0.333f, minPos.Y), new Num.Vector2(maxPos.X * 0.333f, maxPos.Y), 0xff00ffff);
+                list.AddLine(new Num.Vector2(maxPos.X * 0.667f, minPos.Y), new Num.Vector2(maxPos.X * 0.667f, maxPos.Y), 0xff00ffff);
+            }
         }
 
         private void DrawOptionsUI()
