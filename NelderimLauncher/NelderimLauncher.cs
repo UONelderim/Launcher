@@ -102,7 +102,8 @@ namespace Nelderim.Launcher
             if(_UpdateTask.Status != TaskStatus.Running && _LastUpdateCheck.AddMinutes(1) < DateTime.Now)
             {
                 _LastUpdateCheck = DateTime.Now;
-                _UpdateTask.Start();
+                Log("Trying to start task");
+                // _UpdateTask.Start();
             }
             base.Update(gameTime);
         }
@@ -211,16 +212,16 @@ namespace Nelderim.Launcher
             ImGui.SameLine();
             var squareButtonSize = squareImageButtonSize + ImGui.GetStyle().FramePadding * 2;
             ImGui.SetCursorPosX(maxPos.X - squareButtonSize.X * 2 - ImGui.GetStyle().ItemSpacing.X );
-            if(ImGui.Button("Opcje", squareButtonSize))
-            {
-                _ShowOptions = true;
-                _ShowLogs = false;
-            }
-            ImGui.SameLine();
             if (ImGui.Button("Logi", squareButtonSize))
             {
                 _ShowOptions = false;
                 _ShowLogs = true;
+            }
+            ImGui.SameLine();
+            if(ImGui.Button("Opcje", squareButtonSize))
+            {
+                _ShowOptions = true;
+                _ShowLogs = false;
             }
             
             //Logo
@@ -238,7 +239,7 @@ namespace Nelderim.Launcher
             ImGui.PushStyleColor(ImGuiCol.Button, Num.Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Num.Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.ButtonActive, Num.Vector4.Zero);
-            var canRun = !string.IsNullOrEmpty(_LocalManifest.EntryPoint);
+            var canRun = !string.IsNullOrEmpty(_LocalManifest.EntryPoint) && File.Exists(_LocalManifest.EntryPoint);
             var launchTint = canRun && ImGui.IsItemHovered() ? new Num.Vector4(1, 1, 1, 1) : new Num.Vector4(0.6f, 0.6f, 0.6f, 1);
             ImGui.BeginDisabled(!canRun);
             if (ImGui.ImageButton("Uruchom", _LaunchTexture, launchSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, launchTint))
@@ -269,7 +270,7 @@ namespace Nelderim.Launcher
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + bottomAvailSize.X * 0.05f );
             ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 5);
             ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1);
-            ImGui.ProgressBar(0.4f, progressBarSize, "");
+            ImGui.ProgressBar(_DownloadProgressValue, progressBarSize, "");
             ImGui.PopStyleVar(2);
             
             //Progress bar text
@@ -300,7 +301,20 @@ namespace Nelderim.Launcher
             if (ImGui.Button("Weryfikuj instalacje", new Num.Vector2(0, 24)))
             {
                 _ShowOptions = false;
+                // new Task(Verify).Start();
+                
+            }
+            if (ImGui.Button("Odswiez", new Num.Vector2(0, 24)))
+            {
+                _ShowOptions = false;
                 new Task(CheckUpdate).Start();
+                
+            }
+            if (ImGui.Button("Aktualizuj", new Num.Vector2(0, 24)))
+            {
+                _ShowOptions = false;
+                new Task(Update).Start();
+                
             }
             ImGui.Spacing();
             if (ImGui.Button("Utworz skrot na pulpicie"))
@@ -409,7 +423,7 @@ namespace Nelderim.Launcher
                         if(File.Exists(fileInfo.File))
                             File.Delete(fileInfo.File);
                         var directory = Path.GetDirectoryName(fileInfo.File);
-                        if(directory != null)
+                        if(!string.IsNullOrEmpty(directory))
                             Directory.CreateDirectory(directory);
                         await using var file = new FileStream(Path.GetFullPath(fileInfo.File), FileMode.OpenOrCreate);
                         await _HttpClient.DownloadDataAsync($"{PatchUrl}/Nelderim/{fileInfo.File}", //TODO: How to pass 'Nelderim' here?
@@ -483,7 +497,7 @@ namespace Nelderim.Launcher
         private void Log(string text)
         {
             _LastLogMessage = text;
-            _LogText += text + "\n";
+            _LogText += $"{DateTime.UtcNow}: {text}\n";
         }
     }
 }

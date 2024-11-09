@@ -32,7 +32,7 @@ public class Program
         var fileInfos = filteredFiles.Select(filename =>
         {
             var newSha = Utils.Sha1Hash(filename);
-            var newFileName = filename.TrimStart($"{workDir}/".ToCharArray()); // Remove the workDir prefix
+            var newFileName = filename.StartsWith(workDir) ? filename[workDir.Length..] : filename; // Remove the workDir prefix
             var prevFileInfo = currentManifest!.Files.FirstOrDefault(f => f.File == newFileName);
             var prevVersion = prevFileInfo?.Version ?? 0;
             var prevSha = prevFileInfo?.Sha1 ?? "";
