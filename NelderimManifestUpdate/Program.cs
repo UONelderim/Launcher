@@ -7,7 +7,7 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        var entryPoint = args.FirstOrDefault("Nelderim/ClassicUO/ClassicUO.exe");
+        var entryPoint = args.FirstOrDefault("ClassicUO/ClassicUO.exe");
         var workDir = args.FirstOrDefault("Nelderim");
         var manifestPath = $"{workDir}.manifest.json";
         var oldManifestPath = $"{manifestPath}.old";

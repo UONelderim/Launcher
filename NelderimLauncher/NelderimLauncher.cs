@@ -10,7 +10,7 @@ namespace Nelderim.Launcher
 {
     public class NelderimLauncher : Game
     {
-        private const string Version = "2.0.0"; //Pass me from outside
+        private const string Version = "2.0.0-beta"; //Pass me from outside
         private const string MANIFEST_FILE_NAME = "Nelderim.manifest.json";
         private readonly HttpClient _HttpClient = new();
 
@@ -30,6 +30,8 @@ namespace Nelderim.Launcher
         private Manifest _LocalManifest;
         private Manifest _ServerManifest;
         private List<FileInfo> _ChangedFiles;
+        private DateTime _LastUpdateCheck = DateTime.MinValue;
+        private Task _UpdateTask;
 
         public NelderimLauncher(string[] args)
         {
@@ -56,8 +58,8 @@ namespace Nelderim.Launcher
             ImGui.GetStyle().Colors[(int)ImGuiCol.Button] = new Num.Vector4(0.5f, 0.5f, 0.5f, 1);
             ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered] = new Num.Vector4(0.8f, 0.8f, 0.8f, 1);
             ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonActive] = Constants.NelderimColor;
-            ImGui.GetStyle().Colors[(int)ImGuiCol.Text] = new Num.Vector4(0, 0, 0, 1);
-            ImGui.GetStyle().Colors[(int)ImGuiCol.FrameBg] =  new Num.Vector4(0.5f, 0.5f, 0.5f, 1); //ProgressBar empty
+            ImGui.GetStyle().Colors[(int)ImGuiCol.Text] = Num.Vector4.One;
+            ImGui.GetStyle().Colors[(int)ImGuiCol.FrameBg] =  new Num.Vector4(0.3f, 0.3f, 0.3f, 1); //ProgressBar empty
             ImGui.GetStyle().Colors[(int)ImGuiCol.PlotHistogram] =  Constants.NelderimColor; //ProgressBar filled
             
             //Init manifest
@@ -71,6 +73,7 @@ namespace Nelderim.Launcher
                 _LocalManifest = new Manifest(0, [], "");
             }
             //TODO: Bring me back
+            _UpdateTask = new Task(Update);
             // _autoUpdateInfos = FetchAutoUpdateInfo();
             // _updateAvailable = IsUpdateAvailable();
             base.Initialize();
@@ -96,6 +99,11 @@ namespace Nelderim.Launcher
         protected override void Update(GameTime gameTime)
         {
             _ImGuiRenderer.Update(gameTime, IsActive);
+            if(_UpdateTask.Status != TaskStatus.Running && _LastUpdateCheck.AddMinutes(1) < DateTime.Now)
+            {
+                _LastUpdateCheck = DateTime.Now;
+                _UpdateTask.Start();
+            }
             base.Update(gameTime);
         }
 
@@ -302,8 +310,6 @@ namespace Nelderim.Launcher
             ImGui.Spacing();
             if (_ShowAdvancedOptions)
             {
-                ImGui.Text("Zaawansowane");
-                ImGui.Spacing();
                 ImGui.Text("Patch url");
                 if (ImGui.InputText("##PatchUrl", ref Config.Instance.PatchUrl, 256))
                 {
