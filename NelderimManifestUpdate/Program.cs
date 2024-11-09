@@ -7,8 +7,8 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        var entryPoint = args.FirstOrDefault("ClassicUO/ClassicUO.exe");
-        var workDir = args.FirstOrDefault("Nelderim/");
+        var entryPoint = "ClassicUO/ClassicUO.exe";
+        var workDir = "Nelderim";
         var manifestPath = $"{workDir}.manifest.json";
         var oldManifestPath = $"{manifestPath}.old";
         var procName = Process.GetCurrentProcess().ProcessName;
@@ -32,7 +32,7 @@ public class Program
         var fileInfos = filteredFiles.Select(filename =>
         {
             var newSha = Utils.Sha1Hash(filename);
-            var newFileName = filename.StartsWith(workDir) ? filename[workDir.Length..] : filename; // Remove the workDir prefix
+            var newFileName = filename.StartsWith(workDir) ? filename.Substring(workDir.Length + 1) : filename; // Remove the workDir+separator prefix 
             var prevFileInfo = currentManifest!.Files.FirstOrDefault(f => f.File == newFileName);
             var prevVersion = prevFileInfo?.Version ?? 0;
             var prevSha = prevFileInfo?.Sha1 ?? "";
