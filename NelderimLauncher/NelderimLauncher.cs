@@ -3,7 +3,6 @@ using System.Text.Json;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using NativeFileDialogSharp;
 using Nelderim.Utility;
 using Num = System.Numerics;
 
@@ -11,7 +10,7 @@ namespace Nelderim.Launcher
 {
     public class NelderimLauncher : Game
     {
-        private const string Version = "1.1.0"; //Pass me from outside
+        private const string Version = "2.0.0"; //Pass me from outside
         private const string MANIFEST_FILE_NAME = "Nelderim.manifest.json";
         private readonly HttpClient _HttpClient = new();
 
@@ -71,7 +70,6 @@ namespace Nelderim.Launcher
             {
                 _LocalManifest = new Manifest(0, [], "");
             }
-            //Open GamePathPopup if GamePath is empty
             //TODO: Bring me back
             // _autoUpdateInfos = FetchAutoUpdateInfo();
             // _updateAvailable = IsUpdateAvailable();
@@ -125,7 +123,6 @@ namespace Nelderim.Launcher
         private string _DownloadFileName = "";
         private float _DownloadProgressValue;
         private string PatchUrl => Config.Instance.PatchUrl;
-        private DialogResult? _DialogResult;
 
         private void DrawUI()
         {
@@ -151,27 +148,6 @@ namespace Nelderim.Launcher
                 {
                     DrawMainUI();
                 }
-
-                var dummyBool = true;
-                if (ImGui.BeginPopupModal("GamePathPopup", ref dummyBool, ImGuiWindowFlags.NoDecoration))
-                {
-                    if (_DialogResult != null)
-                    {
-                        if(_DialogResult.IsOk)
-                        {
-                            Config.Instance.GamePath = _DialogResult.Path;
-                            Config.Save();
-                        }
-                        _DialogResult = null;
-                        ImGui.CloseCurrentPopup();
-                    }
-
-                    var text = "Podaj sciezke gdzie zainstalowac Nelderim";
-                    var textSize = ImGui.CalcTextSize(text);
-                    ImGui.SetCursorPosX(ImGui.GetContentRegionAvail().X * 0.5f - textSize.X * 0.5f);
-                    ImGui.SetCursorPosY(ImGui.GetContentRegionAvail().Y * 0.5f - textSize.Y * 0.5f);
-                    ImGui.Text("Podaj sciezke gdzie zainstalowac Nelderim");
-                }
                 ImGui.End();
             }
             if (_ShowDebugWindow)
@@ -193,7 +169,7 @@ namespace Nelderim.Launcher
             }
             ImGui.PopStyleVar();
         }
-        
+
         private void DrawMainUI()
         {
             var viewport = ImGui.GetMainViewport();
@@ -313,32 +289,22 @@ namespace Nelderim.Launcher
         private void DrawOptionsUI()
         {
             BackButton();
-            ImGui.TextColored(Num.Vector4.One, "Folder instalacji");
-            ImGui.BeginDisabled();
-            if (ImGui.InputText("##gamepath", ref Config.Instance.GamePath, 256))
-            {
-                Config.Save();
-            }
-            ImGui.EndDisabled();
-            ImGui.SameLine();
-            if (ImGui.Button("..."))
-            {
-                ImGui.OpenPopup("GamePathPopup");
-                Task.Run(() => _DialogResult = Dialog.FolderPicker());
-            }
-            ImGui.BeginDisabled(_Refreshing);
             if (ImGui.Button("Weryfikuj instalacje", new Num.Vector2(0, 24)))
             {
                 _ShowOptions = false;
                 new Task(CheckUpdate).Start();
             }
-            ImGui.EndDisabled();
+            ImGui.Spacing();
+            if (ImGui.Button("Utworz skrot na pulpicie"))
+            {
+                File.CreateSymbolicLink(Process.GetCurrentProcess().MainModule.FileName, Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "/NelderimLauncher.lnk");
+            }
             ImGui.Spacing();
             if (_ShowAdvancedOptions)
             {
                 ImGui.Text("Zaawansowane");
                 ImGui.Spacing();
-                ImGui.Text("Path url");
+                ImGui.Text("Patch url");
                 if (ImGui.InputText("##PatchUrl", ref Config.Instance.PatchUrl, 256))
                 {
                     Config.Save();
@@ -349,13 +315,9 @@ namespace Nelderim.Launcher
         private void DrawLogsUI()
         {
             BackButton();
-            // ImGui.BeginChild("Log", ImGui.GetContentRegionAvail(), ImGuiChildFlags.Border);
-            // ImGui.PushStyleColor(ImGuiCol.Text, new Num.Vector4(1, 1, 1, 1));
             ImGui.InputTextMultiline("Log", ref _LogText, UInt32.MaxValue, ImGui.GetContentRegionAvail(), ImGuiInputTextFlags.ReadOnly);
-            // ImGui.PopStyleColor();
-            // ImGui.EndChild();
         }
-
+        
         private void BackButton()
         {
             var availSpace = ImGui.GetContentRegionAvail();

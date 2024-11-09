@@ -4,15 +4,13 @@ namespace Nelderim.Launcher;
 
 public class ConfigRoot
 {
-    public string GamePath = "";
     public string PatchUrl = "https://www.nelderim.pl/patch";
 }
 
 public static class Config
 {
     public static ConfigRoot Instance;
-    //ProgramData for windows, /usr/share for unix
-    private static string _configFilePath = Environment.SpecialFolder.CommonApplicationData + Path.DirectorySeparatorChar + "NelderimLauncher.json";
+    private static string _configFilePath =  "NelderimLauncher.json";
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
