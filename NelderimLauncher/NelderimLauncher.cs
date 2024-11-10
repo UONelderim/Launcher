@@ -314,11 +314,6 @@ namespace Nelderim.Launcher
             }
             ImGui.EndDisabled();
             ImGui.Spacing();
-            if (ImGui.Button("Utworz skrot na pulpicie"))
-            {
-                File.CreateSymbolicLink(Process.GetCurrentProcess().MainModule.FileName, Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "/NelderimLauncher.lnk");
-            }
-            ImGui.Spacing();
             if (_ShowAdvancedOptions)
             {
                 ImGui.Text("Patch url");
