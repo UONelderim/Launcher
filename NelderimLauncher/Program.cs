@@ -14,7 +14,14 @@ namespace Nelderim.Launcher
             }
 
             using var game = new NelderimLauncher(args);
-            game.Run();
+            try
+            {
+                game.Run();
+            }
+            catch (Exception e)
+            {
+                File.WriteAllText($"Crash_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt", e.ToString());
+            }
         }
 
         private static void AutoUpdate(string targetPath)

@@ -18,7 +18,6 @@ namespace Nelderim.Launcher
         private ImGuiRenderer _ImGuiRenderer;
         
         Dictionary<string, Texture2D> _LoadedTextures = new();
-
         private IntPtr _BackgroundTexture;
         private IntPtr _LaunchTexture;
         private IntPtr _DiscordTexture;
@@ -28,10 +27,7 @@ namespace Nelderim.Launcher
         private bool _UpdateAvailable;
 
         private Manifest _LocalManifest;
-        private Manifest _ServerManifest;
         private List<FileInfo> _ChangedFiles;
-        private DateTime _LastUpdateCheck = DateTime.MinValue;
-        private Task _UpdateTask;
 
         public NelderimLauncher(string[] args)
         {
@@ -41,7 +37,7 @@ namespace Nelderim.Launcher
             _gdm.PreferMultiSampling = true;
             IsMouseVisible = true;
             Window.AllowUserResizing = true;
-            _downloadProgressHandler = new Progress<float>(f => _DownloadProgressValue = f);
+            _DownloadProgressHandler = new Progress<float>(f => _DownloadProgressValue = f);
             
             Window.Title = $"Nelderim Launcher {Version}";
         }
@@ -70,10 +66,10 @@ namespace Nelderim.Launcher
             }
             else
             {
-                _LocalManifest = new Manifest(0, [], "");
+                _LocalManifest = new Manifest(0, [], null, "");
             }
+            Task.Run(Update);
             //TODO: Bring me back
-            _UpdateTask = new Task(Update);
             // _autoUpdateInfos = FetchAutoUpdateInfo();
             // _updateAvailable = IsUpdateAvailable();
             base.Initialize();
@@ -91,7 +87,17 @@ namespace Nelderim.Launcher
 
         private IntPtr BindImage(string fileName)
         {
-            var texture = Texture2D.FromStream(_gdm.GraphicsDevice, GetType().Assembly.GetManifestResourceStream($"NelderimLauncher.{fileName}.png"));
+            var png = $"{fileName}.png";
+            Stream fileStream;
+            if (File.Exists(png))
+            {
+                fileStream = File.OpenRead(png);
+            }
+            else
+            {
+                fileStream = GetType().Assembly.GetManifestResourceStream($"NelderimLauncher.{png}");
+            }
+            var texture = Texture2D.FromStream(_gdm.GraphicsDevice, fileStream);
             _LoadedTextures[fileName] = texture;
             return _ImGuiRenderer.BindTexture(texture);
         }
@@ -99,12 +105,6 @@ namespace Nelderim.Launcher
         protected override void Update(GameTime gameTime)
         {
             _ImGuiRenderer.Update(gameTime, IsActive);
-            if(_UpdateTask.Status != TaskStatus.Running && _LastUpdateCheck.AddMinutes(1) < DateTime.Now)
-            {
-                _LastUpdateCheck = DateTime.Now;
-                Log("Trying to start task");
-                // _UpdateTask.Start();
-            }
             base.Update(gameTime);
         }
 
@@ -127,9 +127,9 @@ namespace Nelderim.Launcher
         
         private string _LogText = "";
         private string _LastLogMessage = "";
-        private bool _Refreshing;
-        private bool _Downloading;
+        private bool _Updating;
         private string _DownloadFileName = "";
+        private Progress<float> _DownloadProgressHandler;
         private float _DownloadProgressValue;
         private string PatchUrl => Config.Instance.PatchUrl;
 
@@ -176,7 +176,6 @@ namespace Nelderim.Launcher
             {
                 _ShowCompositionGuides = !_ShowCompositionGuides;
             }
-            ImGui.PopStyleVar();
         }
 
         private void DrawMainUI()
@@ -239,12 +238,14 @@ namespace Nelderim.Launcher
             ImGui.PushStyleColor(ImGuiCol.Button, Num.Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Num.Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.ButtonActive, Num.Vector4.Zero);
-            var canRun = !string.IsNullOrEmpty(_LocalManifest.EntryPoint) && File.Exists(_LocalManifest.EntryPoint);
+            var canRun = !_Updating && !string.IsNullOrEmpty(_LocalManifest.EntryPoint) && File.Exists(_LocalManifest.EntryPoint);
             var launchTint = canRun && ImGui.IsItemHovered() ? new Num.Vector4(1, 1, 1, 1) : new Num.Vector4(0.6f, 0.6f, 0.6f, 1);
             ImGui.BeginDisabled(!canRun);
             if (ImGui.ImageButton("Uruchom", _LaunchTexture, launchSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, launchTint))
             {
-                Process.Start( _LocalManifest.EntryPoint);
+                var startInfo = new ProcessStartInfo(_LocalManifest.EntryPoint);
+                startInfo.WorkingDirectory = Path.GetDirectoryName(_LocalManifest.EntryPoint);
+                Process.Start(startInfo);
                 Exit();
             }
             ImGui.PopStyleColor(3);
@@ -258,7 +259,7 @@ namespace Nelderim.Launcher
             {
                 ImGui.GetWindowDrawList().AddRectFilled(textPos - ImGui.GetStyle().FramePadding,
                     textPos + textSize + ImGui.GetStyle().FramePadding,
-                    ImGui.GetColorU32(new Num.Vector4(1f, 1f, 1f, 0.6f)));
+                    ImGui.GetColorU32(new Num.Vector4(0f, 0f, 0f, 0.5f)));
             }
             ImGui.SetCursorPos(textPos);
             ImGui.TextUnformatted(_LastLogMessage);
@@ -298,24 +299,20 @@ namespace Nelderim.Launcher
         private void DrawOptionsUI()
         {
             BackButton();
-            if (ImGui.Button("Weryfikuj instalacje", new Num.Vector2(0, 24)))
-            {
-                _ShowOptions = false;
-                // new Task(Verify).Start();
-                
-            }
-            if (ImGui.Button("Odswiez", new Num.Vector2(0, 24)))
-            {
-                _ShowOptions = false;
-                new Task(CheckUpdate).Start();
-                
-            }
+            ImGui.BeginDisabled(_Updating);
             if (ImGui.Button("Aktualizuj", new Num.Vector2(0, 24)))
             {
                 _ShowOptions = false;
-                new Task(Update).Start();
+                Task.Run(Update);
                 
             }
+            if (ImGui.Button("Weryfikuj instalacje", new Num.Vector2(0, 24)))
+            {
+                _ShowOptions = false;
+                Task.Run(Verify);
+                
+            }
+            ImGui.EndDisabled();
             ImGui.Spacing();
             if (ImGui.Button("Utworz skrot na pulpicie"))
             {
@@ -363,95 +360,95 @@ namespace Nelderim.Launcher
                 _UpdateAvailable = false;
             }
         }
-        private async void CheckUpdate()
+
+        private async Task<Manifest> FetchManifest()
         {
-            _Refreshing = true;
-            try
-            {
-                var response = await _HttpClient.GetAsync($"{PatchUrl}/Nelderim.manifest.json");
-                var responseBody = await response.Content.ReadAsStringAsync();
-                _ServerManifest = JsonSerializer.Deserialize<Manifest>(responseBody);
-                _ChangedFiles = _LocalManifest.ChangesBetween(_ServerManifest);
-                if(_ChangedFiles.Count > 0)
-                {
-                    Log("Dostepne sa nowe aktualizacje!");
-                    foreach (var fileInfo in _ChangedFiles)
-                    {
-                        if (fileInfo.Version == -1)
-                        {
-                            Log("Usunieto " + fileInfo.File);
-                        }
-                        else if (fileInfo.Version == 1)
-                        {
-                            Log("Dodano " + fileInfo.File);
-                        }
-                        else
-                        {
-                            Log("Zaktualizowano " + fileInfo.File);
-                        }
-                    }
-                }
-                else
-                {
-                    Log("Wszystkie pliki sa aktualne");
-                }
-            }
-            catch (Exception e)
-            {
-                Log(e.ToString());
-            }
-            finally
-            {
-                _Refreshing = false;
-            }
+            var response = await _HttpClient.GetAsync($"{PatchUrl}/Nelderim.manifest.json");
+            var responseBody = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<Manifest>(responseBody);
         }
-
-
-        private Progress<float> _downloadProgressHandler;
 
         private async void Update()
         {
-            _Downloading = true;
+            var serverManifest = await FetchManifest();
+            _ChangedFiles = _LocalManifest.ChangesBetween(serverManifest);
+            await UpdateFiles(_ChangedFiles);
+            SaveManifest(serverManifest);
+        }
+        
+        private async void Verify()
+        {
+            var serverManifest = await FetchManifest();
+            await UpdateFiles(serverManifest.Files);
+            SaveManifest(serverManifest);
+        }
+        
+        private async Task<bool> UpdateFiles(List<FileInfo> files)
+        {
+            _Updating = true;
             try
             {
-                foreach (var fileInfo in _ChangedFiles)
+                if(files.Count > 0)
                 {
-                    if (fileInfo.Version != -1)
+                    foreach (var fileInfo in files)
                     {
-                        Log($"Pobieram {fileInfo.File}");
-                        _DownloadFileName = fileInfo.File;
-                        if(File.Exists(fileInfo.File))
-                            File.Delete(fileInfo.File);
-                        var directory = Path.GetDirectoryName(fileInfo.File);
-                        if(!string.IsNullOrEmpty(directory))
-                            Directory.CreateDirectory(directory);
-                        await using var file = new FileStream(Path.GetFullPath(fileInfo.File), FileMode.OpenOrCreate);
-                        await _HttpClient.DownloadDataAsync($"{PatchUrl}/Nelderim/{fileInfo.File}", //TODO: How to pass 'Nelderim' here?
-                            file,
-                            _downloadProgressHandler);
+                        if (fileInfo.Version != -1)
+                        {
+                            if (File.Exists(fileInfo.File))
+                            {
+                                Log($"Weryfikuje {fileInfo.File}");
+                                if (Utils.Sha1Hash(fileInfo.File) == fileInfo.Sha1)
+                                    continue;
+                                else
+                                    File.Delete(fileInfo.File);
+                            }
+                            
+                            var directory = Path.GetDirectoryName(fileInfo.File);
+                            if (!string.IsNullOrEmpty(directory))
+                                Directory.CreateDirectory(directory);
+                            
+                            Log($"Pobieram {fileInfo.File}");
+                            _DownloadFileName = fileInfo.File;
+                            await using var file = new FileStream(Path.GetFullPath(fileInfo.File),
+                                FileMode.OpenOrCreate);
+                            await _HttpClient.DownloadDataAsync(
+                                $"{PatchUrl}/Nelderim/{fileInfo.File}", //TODO: How to pass 'Nelderim' here?
+                                file,
+                                _DownloadProgressHandler);
+                        }
+                        else
+                        {
+                            if (File.Exists(fileInfo.File))
+                                File.Delete(fileInfo.File);
+                        }
+                        _DownloadProgressValue = 0f;
+                        _DownloadFileName = "";
                     }
-                    else
-                    {
-                        if(File.Exists(fileInfo.File))
-                            File.Delete(fileInfo.File);
-                    }
+                    Log("Aktualizacja zakonczona");
                 }
-                Log("Wszystkie pliki sa aktualne");
-                _LocalManifest = _ServerManifest;
-                await File.WriteAllTextAsync(MANIFEST_FILE_NAME, JsonSerializer.Serialize(_LocalManifest));
+                else
+                {
+                    Log("Wszystkie pliki aktualne");
+                }
             }
             catch (Exception e)
             {
                 Log(e.ToString());
+                return false;
             }
             finally
             {
-                _Downloading = false;
-                _ChangedFiles = [];
+                _Updating = false;
                 _DownloadProgressValue = 0f;
                 _DownloadFileName = "";
-                _Downloading = false;
             }
+            return true;
+        }
+
+        private async void SaveManifest(Manifest manifest)
+        {
+            await File.WriteAllTextAsync(MANIFEST_FILE_NAME, JsonSerializer.Serialize(manifest));
+            _LocalManifest = manifest;
         }
         
         private bool IsUpdateAvailable()

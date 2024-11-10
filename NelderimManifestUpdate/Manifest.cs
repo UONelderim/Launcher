@@ -1,9 +1,10 @@
 ﻿namespace Nelderim;
 
-public class Manifest(int version, FileInfo[] files, string entryPoint)
+public class Manifest(int version, List<FileInfo> files, FileInfo? launcher, string entryPoint)
 {
     public int Version { get; } = version;
-    public FileInfo[] Files { get; } = files;
+    public List<FileInfo> Files { get; } = files;
+    public FileInfo? Launcher { get; } = launcher;
     public string EntryPoint { get; } = entryPoint;
 
     public List<FileInfo> ChangesBetween(Manifest otherManifest)

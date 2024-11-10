@@ -21,7 +21,7 @@ public class Program
             .Where(f => !excludes.Any(f.StartsWith)) //Exclude based on prefix
             .Order();
         
-        var currentManifest = new Manifest(0, [], entryPoint);
+        var currentManifest = new Manifest(0, [], null, entryPoint);
         if (File.Exists(manifestPath))
         {
             using var currentManifestStream = File.OpenRead(manifestPath);
@@ -29,24 +29,40 @@ public class Program
             File.Move(manifestPath, oldManifestPath, true); //Just in case
         }
 
-        var fileInfos = filteredFiles.Select(filename =>
+        var fileInfos = filteredFiles.Select(realFilename =>
         {
-            var newSha = Utils.Sha1Hash(filename);
-            var newFileName = filename.StartsWith(workDir + Path.DirectorySeparatorChar) ? filename.Substring(workDir.Length + 1) : filename; // Remove the workDir+separator prefix 
+            var newFileName = realFilename.StartsWith(workDir + Path.DirectorySeparatorChar) ? realFilename.Substring(workDir.Length + 1) : realFilename; // Remove the workDir+separator prefix 
             var prevFileInfo = currentManifest!.Files.FirstOrDefault(f => f.File == newFileName);
-            var prevVersion = prevFileInfo?.Version ?? 0;
-            var prevSha = prevFileInfo?.Sha1 ?? "";
-            var newVersion = newSha != prevSha ? prevVersion + 1 : prevVersion;
-
-            return new FileInfo(newFileName, newVersion, newSha);
-        }).ToArray();
-
-        var newManifest = new Manifest(currentManifest.Version + 1, fileInfos, entryPoint);
+            return ProcessFile(realFilename, newFileName, prevFileInfo);
+        }).ToList();
+        
+        FileInfo launcherInfo = null;
+        var launcherPath = "NelderimLauncher.exe";
+        if (File.Exists(launcherPath))
+        {
+            launcherInfo = ProcessFile(launcherPath, launcherPath, currentManifest.Launcher);
+        }
+        
+        var newManifest = new Manifest(currentManifest.Version + 1, fileInfos, launcherInfo, entryPoint);
 
         using var newManifestStream = File.OpenWrite(manifestPath);
         JsonSerializer.Serialize(newManifestStream, newManifest);
     }
+
+    private static FileInfo ProcessFile(string realFilename, string filename, FileInfo? prevFileInfo)
+    {
+        Console.WriteLine("Hashing: " + realFilename);
+        var newSha = Utils.Sha1Hash(realFilename);
+        
+        var prevVersion = prevFileInfo?.Version ?? 0;
+        var prevSha = prevFileInfo?.Sha1 ?? "";
+        var newVersion = newSha != prevSha ? prevVersion + 1 : prevVersion;
+
+        return new FileInfo(filename, newVersion, newSha);
+    }
 }
+
+
 
 
 
