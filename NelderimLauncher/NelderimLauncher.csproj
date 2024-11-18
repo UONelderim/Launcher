@@ -29,7 +29,9 @@
         <EmbeddedResource Include="launch.png" />
         <EmbeddedResource Include="www.png" />
         <EmbeddedResource Include="discord.png" />
+        <EmbeddedResource Include="patreon.png" />
         <EmbeddedResource Include="logo.png" />
+        <EmbeddedResource Include="Footlight-mt-light.ttf" />
     </ItemGroup>
     
     <PropertyGroup Condition="$(RuntimeIdentifier) != '' or $(RunnerOs) != ''"> <!-- publish -->

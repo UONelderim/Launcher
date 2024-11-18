@@ -88,6 +88,19 @@ namespace Nelderim.Launcher
             io.Fonts.ClearTexData(); // Clears CPU side texture data
         }
 
+        public virtual unsafe ImFontPtr LoadFontResource(string fileName, int size_pixels)
+        {
+            var fontStream = GetType().Assembly.GetManifestResourceStream("NelderimLauncher." + fileName);
+            using var reader = new BinaryReader(fontStream);
+            var fontData = reader.ReadBytes((int)fontStream.Length);
+            ImFontPtr fontPtr;
+            fixed (byte* ptr = fontData)
+            {
+                fontPtr = ImGui.GetIO().Fonts.AddFontFromMemoryTTF((IntPtr)ptr, fontData.Length, size_pixels);
+            }
+            return fontPtr;
+        }
+
         public virtual IntPtr BindTexture(Texture2D texture)
         {
             var id = new IntPtr(_textureId++);
