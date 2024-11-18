@@ -222,12 +222,12 @@ namespace Nelderim.Launcher
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Num.Vector4(0.2f, 0.2f, 0.2f, 0.7f));
             if(ImGui.ImageButton("WWW", _WebsiteTexture, smallButtonSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(1,1,1,0.8f)))
             {
-                Browser.Open("https://nelderim.pl");
+                Browser.Open("https://www.nelderim.pl");
             }
             ImGui.SameLine();
             if (ImGui.ImageButton("Discord", _DiscordTexture, smallButtonSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(1,1,1,0.8f)))
             {
-                Browser.Open("https://discord.com/invite/K39RYrJG");
+                Browser.Open("https://discord.gg/GDyGncD");
             }
             ImGui.SameLine();
             if (ImGui.ImageButton("Patreon", _PatreonTexture, smallButtonSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(1,1,1,0.8f)))
@@ -255,11 +255,11 @@ namespace Nelderim.Launcher
             }
             if (ImGui.Button("Rejestracja", buttonSize))
             {
-                Browser.Open("https://nelderim.pl/rejestracja");
+                Browser.Open("https://www.nelderim.pl/rejestracja");
             }
             if (ImGui.Button("Regulamin", buttonSize))
             {
-                Browser.Open("https://nelderim.pl/regulamin");
+                Browser.Open("https://www.nelderim.pl/regulamin");
             }
             ImGui.PopStyleColor(2);
             ImGui.EndGroup();
