@@ -4,6 +4,3 @@
 [submodule "external/FNA"]
 	path = external/FNA
 	url = https://github.com/FNA-XNA/FNA
-[submodule "external/FNA-libs"]
-	path = external/FNA-libs
-	url = https://github.com/deccer/FNA-libs.git
