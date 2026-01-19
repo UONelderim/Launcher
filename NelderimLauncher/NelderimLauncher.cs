@@ -10,7 +10,7 @@ namespace Nelderim.Launcher
 {
     public class NelderimLauncher : Game
     {
-        private const string Version = "2.0.0-beta"; //Pass me from outside
+        private const string Version = "2.0.0"; //Pass me from outside
         private const string MANIFEST_FILE_NAME = "Nelderim.manifest.json";
         private readonly HttpClient _HttpClient = new();
 

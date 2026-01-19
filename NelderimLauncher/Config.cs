@@ -4,7 +4,7 @@ namespace Nelderim.Launcher;
 
 public class ConfigRoot
 {
-    public string PatchUrl = "https://www.nelderim.pl/patch2";
+    public string PatchUrl = "https://www.nelderim.pl/patch";
 }
 
 public static class Config
