@@ -68,7 +68,6 @@ namespace Nelderim.Launcher
             {
                 _LocalManifest = new Manifest(0, [], null, "");
             }
-            Task.Run(Update);
             //TODO: Bring me back
             // _autoUpdateInfos = FetchAutoUpdateInfo();
             // _updateAvailable = IsUpdateAvailable();
@@ -192,16 +191,11 @@ namespace Nelderim.Launcher
             
             //Logo
             var imageSize = new Num.Vector2(_LoadedTextures["logo"].Bounds.Width, _LoadedTextures["logo"].Bounds.Height) * 0.9f;
-            // var imagePos = new Num.Vector2(maxPos.X / 2 - imageSize.X / 2, ImGui.GetCursorStartPos().Y + 20);
             var imagePos = new Num.Vector2(100, 20);
             ImGui.SetCursorPos(imagePos + new Num.Vector2(-3, 1));
-            ImGui.ImageWithBg(new ImTextureRef(null,_LogoTexture), imageSize, Num.Vector2.Zero, Num.Vector2.One, new Num.Vector4(0,0,0,1)); //Outline
+            ImGui.ImageWithBg(new ImTextureRef(null,_LogoTexture), imageSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(0,0,0,1)); //Outline
             ImGui.SetCursorPos(imagePos);
-            ImGui.ImageWithBg(new ImTextureRef(null,_LogoTexture), imageSize, Num.Vector2.Zero, Num.Vector2.One, NelderimTint); //Logo
-            // ImGui.NewLine();
-            // ImGui.PushItemWidth(300);
-            // ImGui.ColorPicker4("Logo tint", ref NelderimTint, ImGuiColorEditFlags.NoSmallPreview | ImGuiColorEditFlags.Float);
-            // ImGui.PopItemWidth();
+            ImGui.ImageWithBg(new ImTextureRef(null,_LogoTexture), imageSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, NelderimTint); //Logo
             
             //TopButtons
             var smallButtonSize = new Num.Vector2(37, 37);
@@ -255,9 +249,10 @@ namespace Nelderim.Launcher
             
             //Run button
             ImGui.PushClipRect(Num.Vector2.Zero, viewport.WorkSize, false);
-            var scale = _gdm.PreferredBackBufferWidth/ (float)_LoadedTextures["background"].Width;
-            var launchSize = new Num.Vector2(_LoadedTextures["launch"].Width, _LoadedTextures["launch"].Height) * scale;
-            var launchPos = new Num.Vector2(viewport.WorkSize.X  - launchSize.X, viewport.WorkSize.Y - launchSize.Y);
+            var wScale = _gdm.PreferredBackBufferWidth / (float)_LoadedTextures["background"].Width;
+            var hScale = _gdm.PreferredBackBufferHeight / (float)_LoadedTextures["background"].Height;
+            var launchSize = new Num.Vector2(_LoadedTextures["launch"].Width * wScale, _LoadedTextures["launch"].Height * hScale);
+            var launchPos = new Num.Vector2((int)(viewport.WorkSize.X  - launchSize.X - 1), (int)(viewport.WorkSize.Y - launchSize.Y - 1));
             ImGui.SetCursorPos(launchPos);
             ImGui.Dummy(launchSize);
             ImGui.SetCursorPos(launchPos);
@@ -265,7 +260,8 @@ namespace Nelderim.Launcher
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Num.Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.ButtonActive, Num.Vector4.Zero);
             var canRun = !_Updating && !string.IsNullOrEmpty(_LocalManifest.EntryPoint) && File.Exists(_LocalManifest.EntryPoint);
-            var launchTint = canRun && ImGui.IsItemHovered() ? new Num.Vector4(1, 1, 1, 1) : new Num.Vector4(0.6f, 0.6f, 0.6f, 1);
+            // var canRun = true; 
+            var launchTint = canRun && ImGui.IsItemHovered() ? Num.Vector4.One : new Num.Vector4(0.6f, 0.6f, 0.6f, 1);
             ImGui.BeginDisabled(!canRun);
             if (ImGui.ImageButton("Uruchom", new ImTextureRef(null,_LaunchTexture), launchSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, launchTint))
             {
@@ -274,15 +270,18 @@ namespace Nelderim.Launcher
                 Process.Start(startInfo);
                 Exit();
             }
-            ImGui.PopStyleColor(3);
             ImGui.EndDisabled();
-            //Run text
-            // var runText = "ZAGRAJ";
-            // var runTextSize = ImGui.CalcTextSize(runText);
-            // var runTextPos = new Num.Vector2(launchPos.X + (launchSize.X - runTextSize.X) * 0.5f, launchPos.Y + launchSize.Y * 0.5f - runTextSize.Y * 0.5f);
-            // ImGui.SetCursorPos(runTextPos);
-            // ImGui.Text(runText);
+            ImGui.PopStyleColor(3);
             ImGui.PopClipRect();
+
+            ImGui.SetCursorPosY(maxPos.Y * 0.8f);
+            ImGui.SetCursorPosX(maxPos.X * 0.35f);
+            ImGui.BeginDisabled(_Updating);
+            if (ImGui.Button("Aktualizuj"))
+            {
+                Task.Run(Update);
+            }
+            ImGui.EndDisabled();
             
             //Status text
             ImGui.SetCursorPosY(maxPos.Y * 0.85f);
@@ -377,7 +376,7 @@ namespace Nelderim.Launcher
         private void DrawLogsUI()
         {
             BackButton();
-            ImGui.InputTextMultiline("Log", ref _LogText, UInt32.MaxValue, ImGui.GetContentRegionAvail(), ImGuiInputTextFlags.ReadOnly);
+            ImGui.InputTextMultiline("Log", ref _LogText, 10000000, ImGui.GetContentRegionAvail(), ImGuiInputTextFlags.ReadOnly);
         }
         
         private void BackButton()
@@ -416,17 +415,18 @@ namespace Nelderim.Launcher
 
         private async void Update()
         {
-            var serverManifest = await FetchManifest();
-            _ChangedFiles = _LocalManifest.ChangesBetween(serverManifest);
-            await UpdateFiles(_ChangedFiles);
-            SaveManifest(serverManifest);
+            Thread.Sleep(TimeSpan.FromSeconds(5));
+            // var serverManifest = await FetchManifest();
+            // _ChangedFiles = _LocalManifest.ChangesBetween(serverManifest);
+            // await UpdateFiles(_ChangedFiles);
+            // SaveManifest(serverManifest);
         }
         
         private async void Verify()
         {
-            var serverManifest = await FetchManifest();
-            await UpdateFiles(serverManifest.Files);
-            SaveManifest(serverManifest);
+            // var serverManifest = await FetchManifest();
+            // await UpdateFiles(serverManifest.Files);
+            // SaveManifest(serverManifest);
         }
         
         private async Task<bool> UpdateFiles(List<FileInfo> files)
