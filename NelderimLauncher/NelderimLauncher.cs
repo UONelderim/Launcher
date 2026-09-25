@@ -10,7 +10,7 @@ namespace Nelderim.Launcher
 {
     public class NelderimLauncher : Game
     {
-        private const string Version = "2.0.0"; //Pass me from outside
+        private const string Version = "2.1.0"; //Pass me from outside
         private const string MANIFEST_FILE_NAME = "Nelderim.manifest.json";
         private readonly HttpClient _HttpClient = new();
 
@@ -271,25 +271,27 @@ namespace Nelderim.Launcher
             ImGui.PushStyleColor(ImGuiCol.ButtonActive, Num.Vector4.Zero);
             var entryPoint = _LocalManifest.EntryPointFor(CurrentPlatform);
             var canRun = !_Updating && !string.IsNullOrEmpty(entryPoint) && File.Exists(entryPoint);
-            // var canRun = true; 
             var launchTint = canRun && ImGui.IsItemHovered() ? Num.Vector4.One : new Num.Vector4(0.6f, 0.6f, 0.6f, 1);
             ImGui.BeginDisabled(!canRun);
             if (ImGui.ImageButton("Uruchom", new ImTextureRef(null,_LaunchTexture), launchSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, launchTint))
             {
                 SetExecutable(entryPoint);
                 var startInfo = new ProcessStartInfo();
-                if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
-                {
-                    startInfo.FileName = "setsid";  // on macOS, setsid may not exist; use "nohup" instead
-                    startInfo.ArgumentList.Add(Path.Combine(Directory.GetCurrentDirectory(), entryPoint));
-                }
-                else
+                if (OperatingSystem.IsWindows())
                 {
                     startInfo.FileName = entryPoint;
                 }
+                else
+                {
+                    // Child inherits our stdout/stderr; once we exit, writes to them kill it (SIGPIPE).
+                    // Detach stdio, ignore SIGHUP and background it so it outlives the launcher.
+                    startInfo.FileName = "/bin/sh";
+                    startInfo.ArgumentList.Add("-c");
+                    startInfo.ArgumentList.Add("nohup \"$0\" </dev/null >/dev/null 2>&1 &");
+                    startInfo.ArgumentList.Add(Path.GetFullPath(entryPoint));
+                }
                 startInfo.WorkingDirectory = Path.GetDirectoryName(entryPoint);
-                Process.Start(startInfo);
-                Thread.Sleep(1000);
+                Process.Start(startInfo)?.WaitForExit(); //Wait for shell exit, game stays open
                 Exit();
             }
             ImGui.EndDisabled();
