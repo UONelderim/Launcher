@@ -1,0 +1,13 @@
+{
+  "username": "",
+  "password": "",
+  "ip": "nelderim.pl",
+  "port": 2593,
+  "ultimaonlinedirectory": "../",
+  "clientversion": "7.0.95.0",
+  "lastcharactername": "",
+  "fps": 60,
+  "plugins": [
+    "RazorEnhanced/RazorEnhanced.exe"
+  ]
+}
