@@ -1,20 +1,50 @@
-﻿namespace Nelderim;
+﻿using System.Text.Json.Serialization;
 
-public class Manifest(int version, List<FileInfo> files, FileInfo? launcher, string entryPoint)
+namespace Nelderim;
+
+public class Manifest(int version, FileInfo? launcher, ManifestSection? common, Dictionary<string, ManifestSection>? platforms)
 {
     public int Version { get; } = version;
-    public List<FileInfo> Files { get; } = files;
     public FileInfo? Launcher { get; } = launcher;
-    public string EntryPoint { get; } = entryPoint;
+    public ManifestSection Common { get; } = common ?? new ManifestSection("", "", []);
+    public Dictionary<string, ManifestSection> Platforms { get; } = platforms ?? new();
 
-    public List<FileInfo> ChangesBetween(Manifest otherManifest)
+    public static Manifest Empty => new(0, null, null, null);
+    
+    public string EntryPointFor(string platform)
+    {
+        return Platforms.TryGetValue(platform, out var section) ? section.EntryPoint : "";
+    }
+
+    // Common files + platform files, platform entry wins on duplicate local path
+    public List<FileInfo> FilesFor(string platform)
+    {
+        var sections = new List<ManifestSection> { Common };
+        if (Platforms.TryGetValue(platform, out var platformSection))
+            sections.Add(platformSection);
+
+        var result = new Dictionary<string, FileInfo>();
+        foreach (var section in sections)
+        {
+            foreach (var file in section.Files)
+            {
+                file.Source = section.Path;
+                result[file.File] = file;
+            }
+        }
+        return result.Values.ToList();
+    }
+
+    public List<FileInfo> ChangesBetween(Manifest otherManifest, string platform)
     {
         if (otherManifest.Version != Version)
         {
-            var added = otherManifest.Files.ExceptBy<FileInfo, string>(Files.Select(f => f.File), f => f.File);
-            var removed = Files.ExceptBy<FileInfo, string>(otherManifest.Files.Select(f => f.File), f => f.File)
+            var files = FilesFor(platform);
+            var otherFiles = otherManifest.FilesFor(platform);
+            var added = otherFiles.ExceptBy<FileInfo, string>(files.Select(f => f.File), f => f.File);
+            var removed = files.ExceptBy<FileInfo, string>(otherFiles.Select(f => f.File), f => f.File)
                 .Select(f => new FileInfo(f.File, -1, ""));
-            var changed = otherManifest.Files.Join(Files,
+            var changed = otherFiles.Join(files,
                     f => f.File,
                     f => f.File,
                     (thisFile, otherFile) => new { thisFile, otherFile })
@@ -26,9 +56,21 @@ public class Manifest(int version, List<FileInfo> files, FileInfo? launcher, str
     }
 }
 
+public class ManifestSection(string path, string entryPoint, List<FileInfo>? files)
+{
+    // Directory on the server, relative to patch url
+    public string Path { get; } = path;
+    public string EntryPoint { get; } = entryPoint;
+    // Paths relative to Path on the server, and to the launcher directory locally
+    public List<FileInfo> Files { get; } = files ?? [];
+}
+
 public class FileInfo(string file, int version, string sha1)
 {
     public string File { get; set; } = file;
     public int Version { get; set; } = version;
     public string Sha1 { get; set; } = sha1;
+
+    [JsonIgnore]
+    public string Source { get; set; } = "";
 }

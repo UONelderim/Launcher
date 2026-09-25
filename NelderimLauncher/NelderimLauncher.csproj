@@ -20,7 +20,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\external\FNA\FNA.Core.csproj" />
-      <ProjectReference Include="..\external\ImGui.NET\src\ImGui.NET\ImGui.NET.csproj" />
       <ProjectReference Include="..\NelderimManifestUpdate\NelderimManifestUpdate.csproj" />
     </ItemGroup>
 
@@ -32,6 +31,7 @@
         <EmbeddedResource Include="Resources\logo.png" />
         <EmbeddedResource Include="Resources\patreon.png" />
         <EmbeddedResource Include="Resources\www.png" />
+        <EmbeddedResource Remove="output\**" />
     </ItemGroup>
     
     <PropertyGroup Condition="$(RuntimeIdentifier) != '' or $(RunnerOs) != ''"> <!-- publish -->
@@ -55,6 +55,14 @@
     <ItemGroup>
       <PackageReference Include="Hexa.NET.ImGui" Version="2.2.9" />
       <PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.18" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Compile Remove="output\**" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <None Remove="output\**" />
     </ItemGroup>
 
     <Target Name="Copy_build" AfterTargets="Build">

@@ -158,7 +158,7 @@ def main():
 
     shutil.copyfile(args.settings, cuo_dir / "settings.json")
 
-    print(f"\nPackage ready ({args.platform}): {cuo_dir}\n{summary}")
+    print(f"\nPackage ready ({args.platform})")
 
 
 if __name__ == "__main__":

@@ -61,12 +61,19 @@ namespace Nelderim.Launcher
             //Init manifest
             if(File.Exists(MANIFEST_FILE_NAME))
             {
-                var jsonText = File.ReadAllText(MANIFEST_FILE_NAME);
-                _LocalManifest = JsonSerializer.Deserialize<Manifest>(jsonText);
+                try
+                {
+                    var jsonText = File.ReadAllText(MANIFEST_FILE_NAME);
+                    _LocalManifest = JsonSerializer.Deserialize<Manifest>(jsonText) ?? Manifest.Empty;
+                }
+                catch (JsonException)
+                {
+                    _LocalManifest = Manifest.Empty;
+                }
             }
             else
             {
-                _LocalManifest = new Manifest(0, [], null, "");
+                _LocalManifest = Manifest.Empty;
             }
             //TODO: Bring me back
             // _autoUpdateInfos = FetchAutoUpdateInfo();
@@ -85,6 +92,9 @@ namespace Nelderim.Launcher
             _LogoTexture = BindImage("logo");
             base.LoadContent();
         }
+        
+        private static string CurrentPlatform =>
+            OperatingSystem.IsWindows() ? "win" : OperatingSystem.IsMacOS() ? "osx" : "linux";
         
         private ImTextureID BindImage(string fileName)
         {
@@ -259,15 +269,27 @@ namespace Nelderim.Launcher
             ImGui.PushStyleColor(ImGuiCol.Button, Num.Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Num.Vector4.Zero);
             ImGui.PushStyleColor(ImGuiCol.ButtonActive, Num.Vector4.Zero);
-            var canRun = !_Updating && !string.IsNullOrEmpty(_LocalManifest.EntryPoint) && File.Exists(_LocalManifest.EntryPoint);
+            var entryPoint = _LocalManifest.EntryPointFor(CurrentPlatform);
+            var canRun = !_Updating && !string.IsNullOrEmpty(entryPoint) && File.Exists(entryPoint);
             // var canRun = true; 
             var launchTint = canRun && ImGui.IsItemHovered() ? Num.Vector4.One : new Num.Vector4(0.6f, 0.6f, 0.6f, 1);
             ImGui.BeginDisabled(!canRun);
             if (ImGui.ImageButton("Uruchom", new ImTextureRef(null,_LaunchTexture), launchSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, launchTint))
             {
-                var startInfo = new ProcessStartInfo(_LocalManifest.EntryPoint);
-                startInfo.WorkingDirectory = Path.GetDirectoryName(_LocalManifest.EntryPoint);
+                SetExecutable(entryPoint);
+                var startInfo = new ProcessStartInfo();
+                if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+                {
+                    startInfo.FileName = "setsid";  // on macOS, setsid may not exist; use "nohup" instead
+                    startInfo.ArgumentList.Add(Path.Combine(Directory.GetCurrentDirectory(), entryPoint));
+                }
+                else
+                {
+                    startInfo.FileName = entryPoint;
+                }
+                startInfo.WorkingDirectory = Path.GetDirectoryName(entryPoint);
                 Process.Start(startInfo);
+                Thread.Sleep(1000);
                 Exit();
             }
             ImGui.EndDisabled();
@@ -415,18 +437,31 @@ namespace Nelderim.Launcher
 
         private async void Update()
         {
-            Thread.Sleep(TimeSpan.FromSeconds(5));
-            // var serverManifest = await FetchManifest();
-            // _ChangedFiles = _LocalManifest.ChangesBetween(serverManifest);
-            // await UpdateFiles(_ChangedFiles);
-            // SaveManifest(serverManifest);
+            try
+            {
+                var serverManifest = await FetchManifest();
+                _ChangedFiles = _LocalManifest.ChangesBetween(serverManifest, CurrentPlatform);
+                if (await UpdateFiles(_ChangedFiles))
+                    SaveManifest(serverManifest);
+            }
+            catch (Exception e)
+            {
+                Log(e.ToString());
+            }
         }
         
         private async void Verify()
         {
-            // var serverManifest = await FetchManifest();
-            // await UpdateFiles(serverManifest.Files);
-            // SaveManifest(serverManifest);
+            try
+            {
+                var serverManifest = await FetchManifest();
+                if (await UpdateFiles(serverManifest.FilesFor(CurrentPlatform)))
+                    SaveManifest(serverManifest);
+            }
+            catch (Exception e)
+            {
+                Log(e.ToString());
+            }
         }
         
         private async Task<bool> UpdateFiles(List<FileInfo> files)
@@ -444,7 +479,9 @@ namespace Nelderim.Launcher
                             {
                                 Log($"Weryfikuje {fileInfo.File}");
                                 if (Utils.Sha1Hash(fileInfo.File) == fileInfo.Sha1)
+                                {
                                     continue;
+                                }
                                 else
                                     File.Delete(fileInfo.File);
                             }
@@ -455,12 +492,13 @@ namespace Nelderim.Launcher
                             
                             Log($"Pobieram {fileInfo.File}");
                             _DownloadFileName = fileInfo.File;
-                            await using var file = new FileStream(Path.GetFullPath(fileInfo.File),
-                                FileMode.OpenOrCreate);
-                            await _HttpClient.DownloadDataAsync(
-                                $"{PatchUrl}/Nelderim/{fileInfo.File}", //TODO: How to pass 'Nelderim' here?
-                                file,
-                                _DownloadProgressHandler);
+                            await using (var file = new FileStream(Path.GetFullPath(fileInfo.File), FileMode.Create))
+                            {
+                                await _HttpClient.DownloadDataAsync(
+                                    $"{PatchUrl}/{fileInfo.Source}/{fileInfo.File}",
+                                    file,
+                                    _DownloadProgressHandler);
+                            }
                         }
                         else
                         {
@@ -489,6 +527,14 @@ namespace Nelderim.Launcher
                 _DownloadFileName = "";
             }
             return true;
+        }
+
+        private static void SetExecutable(string file)
+        {
+            if (OperatingSystem.IsWindows())
+                return;
+            const UnixFileMode exec = UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute;
+            File.SetUnixFileMode(file, File.GetUnixFileMode(file) | exec);
         }
 
         private async void SaveManifest(Manifest manifest)
