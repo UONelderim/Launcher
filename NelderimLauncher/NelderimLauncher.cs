@@ -96,7 +96,7 @@ namespace Nelderim.Launcher
             }
             else
             {
-                fileStream = GetType().Assembly.GetManifestResourceStream($"NelderimLauncher.{png}");
+                fileStream = GetType().Assembly.GetManifestResourceStream($"NelderimLauncher.Resources.{png}");
             }
             var texture = Texture2D.FromStream(_gdm.GraphicsDevice, fileStream);
             _LoadedTextures[fileName] = texture;

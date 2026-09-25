@@ -6,8 +6,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <ApplicationIcon>icon.ico</ApplicationIcon>
-        <OutDir>..\output</OutDir>
+        <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
+        <OutDir>output</OutDir>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -25,13 +25,13 @@
     </ItemGroup>
 
     <ItemGroup>
-        <EmbeddedResource Include="background.png" />
-        <EmbeddedResource Include="launch.png" />
-        <EmbeddedResource Include="www.png" />
-        <EmbeddedResource Include="discord.png" />
-        <EmbeddedResource Include="patreon.png" />
-        <EmbeddedResource Include="logo.png" />
-        <EmbeddedResource Include="Footlight-mt-light.ttf" />
+        <EmbeddedResource Include="Resources\background.png" />
+        <EmbeddedResource Include="Resources\discord.png" />
+        <EmbeddedResource Include="Resources\Footlight-mt-light.ttf" />
+        <EmbeddedResource Include="Resources\launch.png" />
+        <EmbeddedResource Include="Resources\logo.png" />
+        <EmbeddedResource Include="Resources\patreon.png" />
+        <EmbeddedResource Include="Resources\www.png" />
     </ItemGroup>
     
     <PropertyGroup Condition="$(RuntimeIdentifier) != '' or $(RunnerOs) != ''"> <!-- publish -->
@@ -41,19 +41,31 @@
     </PropertyGroup>
     
     <ItemGroup Condition="$(RuntimeIdentifier) == 'win-x64' or $(RuntimeIdentifier) == '' or $(RunnerOs) == 'Windows'">
-        <Content Include="..\external\fnalibs\x64\*" CopyToOutputDirectory="PreserveNewest"/>
+        <DataFiles Include="..\external\fnalibs\x64\*.*"/>
     </ItemGroup>
 
     <ItemGroup Condition="$(RuntimeIdentifier) == 'linux-x64' or $(RuntimeIdentifier) == '' or $(RunnerOs) == 'Linux'">
-        <Content Include="../external/fnalibs/lib64/*" CopyToOutputDirectory="PreserveNewest"/>
+        <DataFiles Include="../external/fnalibs/lib64/*.*"/>
     </ItemGroup>
     
     <ItemGroup Condition="$(RuntimeIdentifier) == 'osx-x64' or $(RuntimeIdentifier) == '' or $(RunnerOs) == 'macOS'">
-        <Content Include="../external/fnalibs/osx/*" CopyToOutputDirectory="PreserveNewest"/>
+        <DataFiles Include="../external/fnalibs/osx/*.*"/>
     </ItemGroup>
     
     <ItemGroup>
       <PackageReference Include="Hexa.NET.ImGui" Version="2.2.9" />
       <PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.18" />
     </ItemGroup>
+
+    <Target Name="Copy_build" AfterTargets="Build">
+        <Copy SourceFiles="@(DataFiles)"
+              DestinationFiles="@(DataFiles->'$(OutDir)/%(RecursiveDir)%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true"/>
+    </Target>
+
+    <Target Name="Copy_publish" AfterTargets="Publish">
+        <Copy SourceFiles="@(DataFiles)"
+              DestinationFiles="@(DataFiles->'$(PublishDir)/%(RecursiveDir)%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true"/>
+    </Target>
 </Project>

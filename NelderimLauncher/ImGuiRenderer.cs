@@ -57,13 +57,6 @@ public class ImGuiRenderer
     private int _indexBufferSize;
 
     private Texture2D[] _LoadedTextures;
-    private ImFontPtr[] _Fonts;
-
-    private int _textureId;
-
-    private int _scrollWheelValue;
-    private readonly float WHEEL_DELTA = 120;
-    private Keys[] _allKeys = Enum.GetValues<Keys>();
 
     unsafe public ImGuiRenderer(GraphicsDevice gd, GameWindow window)
     {
@@ -127,7 +120,7 @@ public class ImGuiRenderer
         
     public unsafe void LoadFontResource(string fontFile, int fontSize)
     {
-        var fontStream = GetType().Assembly.GetManifestResourceStream("NelderimLauncher." + fontFile);
+        var fontStream = GetType().Assembly.GetManifestResourceStream("NelderimLauncher.Resources." + fontFile);
         using var reader = new BinaryReader(fontStream);
         var fontData = reader.ReadBytes((int)fontStream.Length);
         ImFontPtr fontPtr;
