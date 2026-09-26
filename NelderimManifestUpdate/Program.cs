@@ -21,6 +21,12 @@ public class Program
         var procName = Process.GetCurrentProcess().ProcessName;
 
         var excludes = File.ReadAllLines($"{procName}.exclude").Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+        // Files holding user data, only listed keys are forced from server copy. Format: path: key1, key2
+        var mergeFiles = File.ReadAllLines($"{procName}.merge")
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .Select(l => l.Split(':', 2))
+            .ToDictionary(p => p[0].Trim(),
+                p => p[1].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
 
         var currentManifest = Manifest.Empty;
         if (File.Exists(manifestPath))
@@ -30,12 +36,12 @@ public class Program
             File.Move(manifestPath, oldManifestPath, true); //Just in case
         }
 
-        var common = ProcessSection(CommonPath, "", currentManifest.Common, excludes, false);
+        var common = ProcessSection(CommonPath, "", currentManifest.Common, excludes, mergeFiles, false);
         var platforms = new Dictionary<string, ManifestSection>();
         foreach (var (platform, (path, entryPoint)) in PlatformSections)
         {
             currentManifest.Platforms.TryGetValue(platform, out var prevSection);
-            var section = ProcessSection(path, entryPoint, prevSection, excludes, platform != "win");
+            var section = ProcessSection(path, entryPoint, prevSection, excludes, mergeFiles, platform != "win");
             if (section != null)
                 platforms[platform] = section;
         }
@@ -54,7 +60,7 @@ public class Program
     }
 
     private static ManifestSection? ProcessSection(string path, string entryPoint, ManifestSection? prevSection,
-        string[] excludes, bool unix)
+        string[] excludes, Dictionary<string, string[]> mergeFiles, bool unix)
     {
         if (!Directory.Exists(path))
         {
@@ -72,6 +78,7 @@ public class Program
             {
                 var prevFileInfo = prevSection?.Files.FirstOrDefault(p => p.File == f.relative);
                 var fileInfo = ProcessFile(f.realFilename, f.relative, prevFileInfo);
+                fileInfo.MergeKeys = mergeFiles.GetValueOrDefault(f.relative);
                 return fileInfo;
             }).ToList();
 

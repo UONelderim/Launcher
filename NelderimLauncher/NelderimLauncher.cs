@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Hexa.NET.ImGui;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -477,6 +478,12 @@ namespace Nelderim.Launcher
                     {
                         if (fileInfo.Version != -1)
                         {
+                            if (fileInfo.MergeKeys != null && File.Exists(fileInfo.File))
+                            {
+                                Log($"Aktualizuje {fileInfo.File}");
+                                await MergeJsonFile(fileInfo);
+                                continue;
+                            }
                             if (File.Exists(fileInfo.File))
                             {
                                 Log($"Weryfikuje {fileInfo.File}");
@@ -529,6 +536,38 @@ namespace Nelderim.Launcher
                 _DownloadFileName = "";
             }
             return true;
+        }
+
+        private async Task MergeJsonFile(FileInfo fileInfo)
+        {
+            var serverText = await _HttpClient.GetStringAsync($"{PatchUrl}/{fileInfo.Source}/{fileInfo.File}");
+            var server = JsonNode.Parse(serverText)!.AsObject();
+
+            JsonObject local;
+            try
+            {
+                local = JsonNode.Parse(await File.ReadAllTextAsync(fileInfo.File))!.AsObject();
+            }
+            catch (Exception e) when (e is JsonException or InvalidOperationException or NullReferenceException)
+            {
+                await File.WriteAllTextAsync(fileInfo.File, serverText);
+                return;
+            }
+
+            var changed = false;
+            foreach (var key in fileInfo.MergeKeys!)
+            {
+                var serverValue = server[key];
+                if (JsonNode.DeepEquals(local[key], serverValue) && local.ContainsKey(key) == server.ContainsKey(key))
+                    continue;
+                if (server.ContainsKey(key))
+                    local[key] = serverValue?.DeepClone();
+                else
+                    local.Remove(key);
+                changed = true;
+            }
+            if (changed)
+                await File.WriteAllTextAsync(fileInfo.File, local.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
 
         private static void SetExecutable(string file)

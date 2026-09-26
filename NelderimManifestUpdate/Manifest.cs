@@ -71,6 +71,10 @@ public class FileInfo(string file, int version, string sha1)
     public int Version { get; set; } = version;
     public string Sha1 { get; set; } = sha1;
 
+    // JSON file keys enforced from server copy; rest of an existing local file is kept
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string[]? MergeKeys { get; set; }
+
     [JsonIgnore]
     public string Source { get; set; } = "";
 }
