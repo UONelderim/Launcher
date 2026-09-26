@@ -20,7 +20,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\external\FNA\FNA.Core.csproj" />
-      <ProjectReference Include="..\NelderimManifestUpdate\NelderimManifestUpdate.csproj" />
+      <ProjectReference Include="..\NelderimCommon\NelderimCommon.csproj" />
     </ItemGroup>
 
     <ItemGroup>

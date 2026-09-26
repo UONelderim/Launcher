@@ -10,6 +10,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "external", "external", "{DB
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClilocGen", "ClilocGen\ClilocGen.csproj", "{65DFFFDE-DA7C-42A1-AE42-A1136E503601}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NelderimCommon", "NelderimCommon\NelderimCommon.csproj", "{98E8D9E2-5A7A-4E8E-B92A-07CFFD81D993}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,6 +34,10 @@ Global
 		{65DFFFDE-DA7C-42A1-AE42-A1136E503601}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{65DFFFDE-DA7C-42A1-AE42-A1136E503601}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{65DFFFDE-DA7C-42A1-AE42-A1136E503601}.Release|Any CPU.Build.0 = Release|Any CPU
+		{98E8D9E2-5A7A-4E8E-B92A-07CFFD81D993}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{98E8D9E2-5A7A-4E8E-B92A-07CFFD81D993}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{98E8D9E2-5A7A-4E8E-B92A-07CFFD81D993}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{98E8D9E2-5A7A-4E8E-B92A-07CFFD81D993}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{91451584-92E6-4EE3-9268-868E404A684A} = {DB6CAD7A-8427-4E39-8A12-C82A708A22DE}
