@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace Nelderim;
@@ -32,7 +32,7 @@ public class Program
         if (File.Exists(manifestPath))
         {
             using (var currentManifestStream = File.OpenRead(manifestPath))
-                currentManifest = JsonSerializer.Deserialize<Manifest>(currentManifestStream)!;
+                currentManifest = JsonSerializer.Deserialize(currentManifestStream, ManifestJsonContext.Default.Manifest)!;
             File.Move(manifestPath, oldManifestPath, true); //Just in case
         }
 
@@ -56,7 +56,7 @@ public class Program
         var newManifest = new Manifest(currentManifest.Version + 1, launcherInfo, common, platforms);
 
         using var newManifestStream = File.Create(manifestPath);
-        JsonSerializer.Serialize(newManifestStream, newManifest);
+        JsonSerializer.Serialize(newManifestStream, newManifest, ManifestJsonContext.Default.Manifest);
     }
 
     private static ManifestSection? ProcessSection(string path, string entryPoint, ManifestSection? prevSection,

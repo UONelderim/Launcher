@@ -78,3 +78,6 @@ public class FileInfo(string file, int version, string sha1)
     [JsonIgnore]
     public string Source { get; set; } = "";
 }
+
+[JsonSerializable(typeof(Manifest))]
+public partial class ManifestJsonContext : JsonSerializerContext;

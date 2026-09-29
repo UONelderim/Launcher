@@ -41,7 +41,7 @@ namespace Nelderim.Launcher
                 try
                 {
                     var jsonText = File.ReadAllText(MANIFEST_FILE_NAME);
-                    _LocalManifest = JsonSerializer.Deserialize<Manifest>(jsonText) ?? Manifest.Empty;
+                    _LocalManifest = JsonSerializer.Deserialize(jsonText, ManifestJsonContext.Default.Manifest) ?? Manifest.Empty;
                 }
                 catch (JsonException)
                 {
@@ -391,7 +391,7 @@ namespace Nelderim.Launcher
         {
             var response = await _HttpClient.GetAsync($"{PatchUrl}/Nelderim.manifest.json");
             var responseBody = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<Manifest>(responseBody);
+            return JsonSerializer.Deserialize(responseBody, ManifestJsonContext.Default.Manifest);
         }
 
         private async void Update()
@@ -536,7 +536,7 @@ namespace Nelderim.Launcher
 
         private async void SaveManifest(Manifest manifest)
         {
-            await File.WriteAllTextAsync(MANIFEST_FILE_NAME, JsonSerializer.Serialize(manifest));
+            await File.WriteAllTextAsync(MANIFEST_FILE_NAME, JsonSerializer.Serialize(manifest, ManifestJsonContext.Default.Manifest));
             _LocalManifest = manifest;
         }
         

@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Nelderim.Launcher;
 
@@ -12,11 +13,6 @@ public static class Config
     public static ConfigRoot Instance;
     private static string _configFilePath =  "NelderimLauncher.json";
 
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        IncludeFields = true
-    };
-    
     static Config()
     {
         if (File.Exists(_configFilePath))
@@ -24,7 +20,7 @@ public static class Config
             var jsonText = File.ReadAllText(_configFilePath);
             try
             {
-                Instance = JsonSerializer.Deserialize<ConfigRoot>(jsonText, SerializerOptions);
+                Instance = JsonSerializer.Deserialize(jsonText, ConfigJsonContext.Default.ConfigRoot);
             }
             catch (Exception e)
             {
@@ -32,7 +28,7 @@ public static class Config
                 File.Delete(_configFilePath);
             }
         }
-        if (!File.Exists(_configFilePath))
+        if (Instance == null || !File.Exists(_configFilePath))
         {
             Instance = new ConfigRoot();
             Save();
@@ -41,6 +37,10 @@ public static class Config
 
     public static void Save()
     {
-        File.WriteAllText(_configFilePath, JsonSerializer.Serialize(Instance, SerializerOptions));
+        File.WriteAllText(_configFilePath, JsonSerializer.Serialize(Instance, ConfigJsonContext.Default.ConfigRoot));
     }
 }
+
+[JsonSourceGenerationOptions(IncludeFields = true)]
+[JsonSerializable(typeof(ConfigRoot))]
+internal partial class ConfigJsonContext : JsonSerializerContext;
