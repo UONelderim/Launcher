@@ -90,13 +90,13 @@ public class ImGuiRenderer : IDisposable
         var fontStream = GetType().Assembly.GetManifestResourceStream("NelderimLauncher.Resources." + fontFile);
         using var reader = new BinaryReader(fontStream);
         var fontData = reader.ReadBytes((int)fontStream.Length);
-        ImFontPtr fontPtr;
-        fixed (byte* ptr = fontData)
-        {
-            fontPtr = ImGui.GetIO().Fonts.AddFontFromMemoryTTF(ptr, fontData.Length, fontSize);
-        }
+        //Glyphs are rasterized lazily, so atlas must own font data for its whole lifetime
+        var nativeData = ImGui.MemAlloc((nuint)fontData.Length);
+        fontData.CopyTo(new Span<byte>(nativeData, fontData.Length));
+        var fontPtr = ImGui.GetIO().Fonts.AddFontFromMemoryTTF(nativeData, fontData.Length, fontSize);
 
-        ImGui.PushFont(fontPtr, fontSize);
+        ImGui.GetIO().FontDefault = fontPtr;
+        ImGui.GetStyle().FontSizeBase = fontSize;
     }
 
     public TextureData GetTexture(string name)
@@ -275,6 +275,16 @@ public class ImGuiRenderer : IDisposable
         foreach (var texture in _TextureHandles)
             SDL.ReleaseGPUTexture(_GpuDevice, (SDLGPUTexture*)texture);
         _Textures.Clear();
+        
+        SDL.WaitForGPUIdle(_GpuDevice);
+        SDLBackend.ImGuiImplSDL3.Shutdown();
+        SDLBackend.ImGuiImplSDL3.SDLGPU3Shutdown();
+        ImGui.DestroyContext();
+
+        SDL.ReleaseWindowFromGPUDevice(_GpuDevice, _Window);
+        SDL.DestroyGPUDevice(_GpuDevice);
+        SDL.DestroyWindow(_Window);
+        SDL.Quit();
     }
 }
 
