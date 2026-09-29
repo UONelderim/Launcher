@@ -248,7 +248,7 @@ namespace Nelderim.Launcher
                     startInfo.ArgumentList.Add(Path.GetFullPath(entryPoint));
                 }
                 startInfo.WorkingDirectory = Path.GetDirectoryName(entryPoint);
-                Process.Start(startInfo)?.WaitForExit(); //Wait for shell exit, game stays open
+                Process.Start(startInfo)?.WaitForExit(5000); //Wait for shell exit, game stays open
                 done = true;
             }
             ImGui.EndDisabled();
