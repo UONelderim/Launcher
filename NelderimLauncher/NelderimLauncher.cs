@@ -1,21 +1,21 @@
 ﻿using System.Diagnostics;
+using System.Drawing;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Hexa.NET.ImGui;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using Nelderim.Utility;
 using Num = System.Numerics;
+using Hexa.NET.ImGui;
+
+using System.Numerics;
 
 namespace Nelderim.Launcher
 {
-    public class NelderimLauncher : Game
+    public class NelderimLauncher : IDisposable
     {
         private const string Version = "2.1.0"; //Pass me from outside
         private const string MANIFEST_FILE_NAME = "Nelderim.manifest.json";
         private readonly HttpClient _HttpClient = new();
-
-        private GraphicsDeviceManager _gdm;
+        
         private ImGuiRenderer _ImGuiRenderer;
         
         Dictionary<string, Texture2D> _LoadedTextures = new();
@@ -31,24 +31,11 @@ namespace Nelderim.Launcher
         private Manifest _LocalManifest;
         private List<FileInfo> _ChangedFiles;
 
-        public NelderimLauncher(string[] args)
+        public unsafe NelderimLauncher(string[] args)
         {
-            _gdm = new GraphicsDeviceManager(this);
-            _gdm.PreferredBackBufferWidth = 1280;
-            _gdm.PreferredBackBufferHeight = 720;
-            _gdm.PreferMultiSampling = true;
-            IsMouseVisible = true;
-            Window.AllowUserResizing = false;
+            _ImGuiRenderer = new ImGuiRenderer(Version);
             _DownloadProgressHandler = new Progress<float>(f => _DownloadProgressValue = f);
             
-            Window.Title = $"Nelderim Launcher {Version}";
-        }
-
-        protected override void Initialize()
-        {
-            _ImGuiRenderer = new ImGuiRenderer(_gdm.GraphicsDevice, Window);
-
-            //Init style
             ImGui.StyleColorsDark();
             ImGui.GetStyle().FramePadding = new Num.Vector2(8, 4);
             ImGui.GetStyle().FrameRounding = 3;
@@ -79,10 +66,11 @@ namespace Nelderim.Launcher
             //TODO: Bring me back
             // _autoUpdateInfos = FetchAutoUpdateInfo();
             // _updateAvailable = IsUpdateAvailable();
-            base.Initialize();
+            
+            LoadContent();
         }
-
-        protected override void LoadContent()
+        
+        private void LoadContent()
         {
             _ImGuiRenderer.LoadFontResource("Footlight-mt-light.ttf", 24);
             _BackgroundTexture = BindImage("background");
@@ -91,7 +79,6 @@ namespace Nelderim.Launcher
             _DiscordTexture = BindImage("discord");
             _PatreonTexture = BindImage("patreon");
             _LogoTexture = BindImage("logo");
-            base.LoadContent();
         }
         
         private static string CurrentPlatform =>
@@ -109,19 +96,23 @@ namespace Nelderim.Launcher
             {
                 fileStream = GetType().Assembly.GetManifestResourceStream($"NelderimLauncher.Resources.{png}");
             }
+            
             var texture = Texture2D.FromStream(_gdm.GraphicsDevice, fileStream);
             _LoadedTextures[fileName] = texture;
             return _ImGuiRenderer.BindTexture(texture);
         }
         
-        protected override void Draw(GameTime gameTime)
+        public void Run()
         {
-            GraphicsDevice.Clear(Color.Black);
-            _ImGuiRenderer.BeforeDraw();
-            DrawUI();
-            _ImGuiRenderer.AfterDraw();
-
-            base.Draw(gameTime);
+            bool done = false;
+            while (!done)
+            {
+                if (_ImGuiRenderer.BeforeDraw(out done))
+                {
+                    DrawUI();
+                }
+                _ImGuiRenderer.AfterDraw();
+            }
         }
         
         private bool _ShowDebugWindow;
@@ -260,8 +251,8 @@ namespace Nelderim.Launcher
             
             //Run button
             ImGui.PushClipRect(Num.Vector2.Zero, viewport.WorkSize, false);
-            var wScale = _gdm.PreferredBackBufferWidth / (float)_LoadedTextures["background"].Width;
-            var hScale = _gdm.PreferredBackBufferHeight / (float)_LoadedTextures["background"].Height;
+            var wScale = ImGuiRenderer.WindowWidth / (float)_LoadedTextures["background"].Width;
+            var hScale = ImGuiRenderer.WindowHeight / (float)_LoadedTextures["background"].Height;
             var launchSize = new Num.Vector2(_LoadedTextures["launch"].Width * wScale, _LoadedTextures["launch"].Height * hScale);
             var launchPos = new Num.Vector2((int)(viewport.WorkSize.X  - launchSize.X - 1), (int)(viewport.WorkSize.Y - launchSize.Y - 1));
             ImGui.SetCursorPos(launchPos);
@@ -628,6 +619,12 @@ namespace Nelderim.Launcher
         {
             _LastLogMessage = text;
             _LogText += $"{DateTime.UtcNow}: {text}\n";
+        }
+
+        public void Dispose()
+        {
+            _HttpClient.Dispose();
+            _ImGuiRenderer.Dispose();
         }
     }
 }

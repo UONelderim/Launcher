@@ -1,25 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>WinExe</OutputType>
+        <OutputType>Exe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
-        <OutDir>output</OutDir>
-    </PropertyGroup>
-
-    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-      <PlatformTarget>AnyCPU</PlatformTarget>
-    </PropertyGroup>
-
-    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-      <PlatformTarget>AnyCPU</PlatformTarget>
+        <OutDir>../OutLauncher</OutDir>
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\external\FNA\FNA.Core.csproj" />
       <ProjectReference Include="..\NelderimCommon\NelderimCommon.csproj" />
     </ItemGroup>
 
@@ -34,46 +25,10 @@
         <EmbeddedResource Remove="output\**" />
     </ItemGroup>
     
-    <PropertyGroup Condition="$(RuntimeIdentifier) != '' or $(RunnerOs) != ''"> <!-- publish -->
-        <PublishSingleFile>true</PublishSingleFile>
-        <SelfContained>false</SelfContained>
-        <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
-    </PropertyGroup>
-    
-    <ItemGroup Condition="$(RuntimeIdentifier) == 'win-x64' or $(RuntimeIdentifier) == '' or $(RunnerOs) == 'Windows'">
-        <DataFiles Include="..\external\fnalibs\x64\*.*"/>
-    </ItemGroup>
-
-    <ItemGroup Condition="$(RuntimeIdentifier) == 'linux-x64' or $(RuntimeIdentifier) == '' or $(RunnerOs) == 'Linux'">
-        <DataFiles Include="../external/fnalibs/lib64/*.*"/>
-    </ItemGroup>
-    
-    <ItemGroup Condition="$(RuntimeIdentifier) == 'osx-x64' or $(RuntimeIdentifier) == '' or $(RunnerOs) == 'macOS'">
-        <DataFiles Include="../external/fnalibs/osx/*.*"/>
-    </ItemGroup>
-    
     <ItemGroup>
       <PackageReference Include="Hexa.NET.ImGui" Version="2.2.9" />
       <PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.18" />
+      <PackageReference Include="Hexa.NET.SDL3" Version="1.2.17" />
+      <PackageReference Include="Hexa.NET.Utilities" Version="2.2.12" />
     </ItemGroup>
-    
-    <ItemGroup>
-      <Compile Remove="output\**" />
-    </ItemGroup>
-    
-    <ItemGroup>
-      <None Remove="output\**" />
-    </ItemGroup>
-
-    <Target Name="Copy_build" AfterTargets="Build">
-        <Copy SourceFiles="@(DataFiles)"
-              DestinationFiles="@(DataFiles->'$(OutDir)/%(RecursiveDir)%(Filename)%(Extension)')"
-              SkipUnchangedFiles="true"/>
-    </Target>
-
-    <Target Name="Copy_publish" AfterTargets="Publish">
-        <Copy SourceFiles="@(DataFiles)"
-              DestinationFiles="@(DataFiles->'$(PublishDir)/%(RecursiveDir)%(Filename)%(Extension)')"
-              SkipUnchangedFiles="true"/>
-    </Target>
 </Project>

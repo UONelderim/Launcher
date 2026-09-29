@@ -1,123 +1,91 @@
-﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
-using System.Runtime.InteropServices;
-using Hexa.NET.ImGui;
-using Hexa.NET.ImGui.Backends.SDL3;
-using static SDL3.SDL;
+﻿using Hexa.NET.ImGui;
+using Hexa.NET.SDL3;
+using SDLBackend = Hexa.NET.ImGui.Backends.SDL3;
 
 namespace Nelderim.Launcher;
 
-public static class DrawVertDeclaration
+public class ImGuiRenderer : IDisposable
 {
-    public static readonly VertexDeclaration Declaration;
-
-    public static readonly int Size;
-
-    static DrawVertDeclaration()
-    {
-        unsafe
-        {
-            Size = sizeof(ImDrawVert);
-        }
-
-        Declaration = new VertexDeclaration
-        (
-            Size,
-
-            // Position
-            new VertexElement(0, VertexElementFormat.Vector2, VertexElementUsage.Position, 0),
-
-            // UV
-            new VertexElement(8, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0),
-
-            // Color
-            new VertexElement(16, VertexElementFormat.Color, VertexElementUsage.Color, 0)
-        );
-    }
-}
-
-public class ImGuiRenderer
-{
-    // Event handling
-    private SDL_EventFilter _EventFilter;
-    private SDL_EventFilter _PrevEventFilter;
-        
-    private GraphicsDevice _graphicsDevice;
-
-    private BasicEffect _effect;
-    private RasterizerState _rasterizerState;
-
-    private byte[] _vertexData;
-    private VertexBuffer _vertexBuffer;
-    private int _vertexBufferSize;
-
-    private byte[] _indexData;
-    private IndexBuffer _indexBuffer;
-    private int _indexBufferSize;
+    public const int WindowWidth = 1280;
+    public const int WindowHeight = 720;
+    
+    private SDLWindowPtr _Window;
+    private SDLGPUDevicePtr _GpuDevice;
 
     private Texture2D[] _LoadedTextures;
 
-    unsafe public ImGuiRenderer(GraphicsDevice gd, GameWindow window)
+    public unsafe ImGuiRenderer(string version)
     {
-        var context = ImGui.CreateContext();
-        ImGui.SetCurrentContext(context);
-        ImGuiImplSDL3.SetCurrentContext(context);
-
-        _graphicsDevice = gd;
-
-        _LoadedTextures = new Texture2D[2];
-
-        _rasterizerState = new RasterizerState()
+        if (!SDL.Init((uint)(SDLInitFlags.Video | SDLInitFlags.Gamepad)))
         {
-            CullMode = CullMode.None,
-            DepthBias = 0,
-            FillMode = FillMode.Solid,
-            MultiSampleAntiAlias = false,
-            ScissorTestEnable = true,
-            SlopeScaleDepthBias = 0
+            Console.WriteLine($"Error: SDL_Init(): {SDL.GetErrorS()}");
+            return;
+        }
+
+        float mainScale = SDL.GetDisplayContentScale(SDL.GetPrimaryDisplay());
+        var windowFlags = (uint)(SDLWindowFlags.Hidden | SDLWindowFlags.HighPixelDensity);
+        _Window = SDL.CreateWindow($"Nelderim Launcher {version}",
+            (int)(WindowWidth * mainScale), (int)(WindowHeight * mainScale), windowFlags);
+        if (_Window.IsNull)
+        {
+            Console.WriteLine($"Error: SDL_CreateWindow(): {SDL.GetErrorS()}");
+            return;
+        }
+
+        SDL.SetWindowPosition(_Window, (int)SDL.SDL_WINDOWPOS_CENTERED_MASK, (int)SDL.SDL_WINDOWPOS_CENTERED_MASK);
+        SDL.ShowWindow(_Window);
+
+        _GpuDevice = SDL.CreateGPUDevice(
+            (uint)(SDLGPUShaderFormat.Spirv | SDLGPUShaderFormat.Dxil | SDLGPUShaderFormat.Metallib),
+            true, (byte*)null);
+        if (_GpuDevice.IsNull)
+        {
+            Console.WriteLine($"Error: SDL_CreateGPUDevice(): {SDL.GetErrorS()}");
+            return;
+        }
+
+        if (!SDL.ClaimWindowForGPUDevice(_GpuDevice, _Window))
+        {
+            Console.WriteLine($"Error: SDL_ClaimWindowForGPUDevice(): {SDL.GetErrorS()}");
+            return;
+        }
+
+        SDL.SetGPUSwapchainParameters(_GpuDevice, _Window,
+            SDLGPUSwapchainComposition.Sdr, SDLGPUPresentMode.Mailbox);
+
+        var ctx = ImGui.CreateContext();
+        ImGui.SetCurrentContext(ctx);
+        ImGuiIOPtr io = ImGui.GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags.NavEnableKeyboard
+                          | ImGuiConfigFlags.NavEnableGamepad
+                          | ImGuiConfigFlags.DockingEnable
+                          | ImGuiConfigFlags.ViewportsEnable;
+
+        ImGui.StyleColorsDark();
+        var style = ImGui.GetStyle();
+        style.ScaleAllSizes(mainScale);
+        style.FontScaleDpi = mainScale;
+        io.ConfigDpiScaleFonts = true;
+        io.ConfigDpiScaleViewports = true;
+
+        if ((io.ConfigFlags & ImGuiConfigFlags.ViewportsEnable) != 0)
+        {
+            style.WindowRounding = 0.0f;
+            style.Colors[(int)ImGuiCol.WindowBg].W = 1.0f;
+        }
+
+        SDLBackend.ImGuiImplSDL3.SetCurrentContext(ctx);
+        SDLBackend.ImGuiImplSDL3.InitForSDLGPU((SDLBackend.SDLWindow*)_Window.Handle);
+
+        SDLBackend.ImGuiImplSDLGPU3InitInfo initInfo = new()
+        {
+            Device = (SDLBackend.SDLGPUDevice*)_GpuDevice.Handle,
+            ColorTargetFormat = (int)SDL.GetGPUSwapchainTextureFormat(_GpuDevice, _Window),
+            MSAASamples = (int)SDLGPUSampleCount.Samplecount1
         };
-
-        var io = ImGui.GetIO();
-        var glContext = SDL_GL_GetCurrentContext();
-        if (glContext == IntPtr.Zero) 
-        {
-            ImGuiImplSDL3.InitForSDLGPU((SDLWindow*)window.Handle);
-            //Viewports work for non-OpenGL
-            io.BackendFlags |= ImGuiBackendFlags.RendererHasViewports;
-        }
-        else
-        {
-            ImGuiImplSDL3.InitForOpenGL((SDLWindow*)window.Handle, (void*)glContext);
-        }
-
-        io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset;
-        io.BackendFlags |= ImGuiBackendFlags.RendererHasTextures;
-        io.ConfigInputTrickleEventQueue = false;
-            
-        // Use a filter to get SDL events for your extra window
-        IntPtr prevUserData;
-        SDL_GetEventFilter(
-            out _PrevEventFilter,
-            out prevUserData
-        );
-        _EventFilter = EventFilter;
-        SDL_SetEventFilter(
-            _EventFilter,
-            prevUserData
-        );
-        
+        SDLBackend.ImGuiImplSDL3.SDLGPU3Init(&initInfo);
     }
-    private unsafe bool EventFilter(IntPtr userdata, SDL_Event* evt)
-    {
-        ImGuiImplSDL3.ProcessEvent((SDLEvent*)evt);
-        if (_PrevEventFilter != null)
-        {
-            return _PrevEventFilter(userdata, evt);
-        }
-        return true;
-    }
-        
+
     public unsafe void LoadFontResource(string fontFile, int fontSize)
     {
         var fontStream = GetType().Assembly.GetManifestResourceStream("NelderimLauncher.Resources." + fontFile);
@@ -128,6 +96,7 @@ public class ImGuiRenderer
         {
             fontPtr = ImGui.GetIO().Fonts.AddFontFromMemoryTTF(ptr, fontData.Length, fontSize);
         }
+
         ImGui.PushFont(fontPtr, fontSize);
     }
 
@@ -137,7 +106,7 @@ public class ImGuiRenderer
         if (id == -1)
         {
             //Zero index is null ImTextureID, so we just keep this one empty.
-            for (var i = 1; i < _LoadedTextures.Length; i++) 
+            for (var i = 1; i < _LoadedTextures.Length; i++)
             {
                 if (_LoadedTextures[i] == null)
                 {
@@ -146,6 +115,7 @@ public class ImGuiRenderer
                     break;
                 }
             }
+
             if (id == -1)
             {
                 id = _LoadedTextures.Length;
@@ -161,231 +131,78 @@ public class ImGuiRenderer
     {
         _LoadedTextures[(int)textureId.Handle] = null;
     }
-    
-    public virtual void BeforeDraw()
+
+    public unsafe bool BeforeDraw(out bool done)
     {
-        ImGuiImplSDL3.NewFrame();
+        done = false;
+        SDLEvent e;
+        while (SDL.PollEvent(&e))
+        {
+            SDLBackend.ImGuiImplSDL3.ProcessEvent((SDLBackend.SDLEvent*)&e);
+            var type = (SDLEventType)e.Type;
+            if (type == SDLEventType.Quit ||
+                (type == SDLEventType.WindowCloseRequested &&
+                 e.Window.WindowID == SDL.GetWindowID(_Window)))
+            {
+                done = true;
+            }
+        }
+
+        if ((SDL.GetWindowFlags(_Window) & (ulong)SDLWindowFlags.Minimized) != 0)
+        {
+            SDL.Delay(10);
+            return false;
+        }
+
+        SDLBackend.ImGuiImplSDL3.SDLGPU3NewFrame();
+        SDLBackend.ImGuiImplSDL3.NewFrame();
         ImGui.NewFrame();
+
+        return true;
     }
 
     public virtual unsafe void AfterDraw()
     {
         ImGui.Render();
-        RenderDrawData(ImGui.GetDrawData());
-    }
+        ImDrawData* drawData = ImGui.GetDrawData();
+        bool isMinimized = drawData->DisplaySize.X <= 0 || drawData->DisplaySize.Y <= 0;
 
-    protected virtual Effect UpdateEffect(Texture2D texture, ImDrawDataPtr drawData)
-    {
-        _effect ??= new BasicEffect(_graphicsDevice);
+        SDLGPUCommandBuffer* commandBuffer = SDL.AcquireGPUCommandBuffer(_GpuDevice);
+        SDLGPUTexture* swapTexture;
+        SDL.AcquireGPUSwapchainTexture(commandBuffer, _Window, &swapTexture, null, null);
 
-        _effect.World = Matrix.Identity;
-        _effect.View = Matrix.Identity;
-        _effect.Projection = Matrix.CreateOrthographicOffCenter(
-            drawData.DisplayPos.X,
-            drawData.DisplayPos.X + drawData.DisplaySize.X,
-            drawData.DisplayPos.Y + drawData.DisplaySize.Y,
-            drawData.DisplayPos.Y, -1f, 1f);
-        _effect.TextureEnabled = true;
-        _effect.Texture = texture;
-        _effect.VertexColorEnabled = true;
-
-        return _effect;
-    }
-
-    private unsafe void RenderDrawData(ImDrawData* drawData)
-    {
-        if (drawData->Textures != ImTextureDataPtr.Null)
+        if (swapTexture != null && !isMinimized)
         {
-            for (var i = 0; i < drawData->Textures->Size; i++)
+            SDLBackend.ImGuiImplSDL3.SDLGPU3PrepareDrawData(drawData, (SDLBackend.SDLGPUCommandBuffer*)commandBuffer);
+
+            SDLGPUColorTargetInfo targetInfo = new()
             {
-                var tex = drawData->Textures->Data[i];
-                if (tex.Status != ImTextureStatus.Ok)
-                {
-                    UpdateTexture(tex);
-                }
-            }
-        }
-        _graphicsDevice.BlendFactor = Color.White;
-        _graphicsDevice.BlendState = BlendState.NonPremultiplied;
-        _graphicsDevice.RasterizerState = _rasterizerState;
-        _graphicsDevice.DepthStencilState = DepthStencilState.None;
-        _graphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
+                Texture = swapTexture,
+                ClearColor = new SDLFColor(),
+                LoadOp = SDLGPULoadOp.Clear,
+                StoreOp = SDLGPUStoreOp.Store,
+                MipLevel = 0,
+                LayerOrDepthPlane = 0,
+                Cycle = 0
+            };
 
-        // Handle cases of screen coordinates != from framebuffer coordinates (e.g. retina displays)
-        drawData->ScaleClipRects(ImGui.GetIO().DisplayFramebufferScale);
+            SDLGPURenderPass* renderPass = SDL.BeginGPURenderPass(commandBuffer, &targetInfo, 1, null);
+            SDLBackend.ImGuiImplSDL3.SDLGPU3RenderDrawData(drawData, (SDLBackend.SDLGPUCommandBuffer*)commandBuffer,
+                (SDLBackend.SDLGPURenderPass*)renderPass, null);
+            SDL.EndGPURenderPass(renderPass);
+        }
 
-        UpdateBuffers(drawData);
+        //No need for viewports
+        // if ((io.ConfigFlags & ImGuiConfigFlags.ViewportsEnable) != 0)
+        // {
+        //     ImGui.UpdatePlatformWindows();
+        //     ImGui.RenderPlatformWindowsDefault();
+        // }
 
-        RenderCommandLists(drawData);
-    }
-    
-    private unsafe void UpdateTexture(ImTextureDataPtr tex)
-    {
-        if (tex.Status == ImTextureStatus.WantCreate)
-        {
-            var texData = tex.GetPixels();
-            var pixels = new byte[tex.GetSizeInBytes()];
-            Marshal.Copy(new IntPtr(texData), pixels, 0, pixels.Length);
-            var tex2D = new Texture2D(_graphicsDevice, tex.Width, tex.Height, false, SurfaceFormat.Color);
-            tex2D.SetData(pixels);
-            var textureId = BindTexture(tex2D);
-            tex.SetTexID(textureId);
-            tex.SetStatus(ImTextureStatus.Ok);
-        }
-        if (tex.Status == ImTextureStatus.WantUpdates)
-        {
-            var tex2d = _LoadedTextures[(int)tex.TexID.Handle];
-            var x = tex.UpdateRect.X;
-            var y = tex.UpdateRect.Y;
-            var w = tex.UpdateRect.W;
-            var h = tex.UpdateRect.H;
-            var pixels = new byte[w * h * tex.BytesPerPixel];
-            var pos = 0;
-            var rowLength = w * tex.BytesPerPixel;
-            for(var i = y; i < y + h; i++){
-                var updateData = tex.GetPixelsAt(x, i);
-                Marshal.Copy(new IntPtr(updateData), pixels, pos, rowLength);
-                pos += rowLength;
-            }
-            tex2d.SetData(0, new Rectangle(x,y,w,h), pixels, 0, pixels.Length);
-            tex.SetStatus(ImTextureStatus.Ok);
-        }
-        if (tex.Status == ImTextureStatus.WantDestroy)
-        {
-            var tex2d = _LoadedTextures[(int)tex.TexID.Handle];
-            tex2d.Dispose();
-            UnbindTexture(tex.TexID);
-            tex.SetTexID(ImTextureID.Null);
-            tex.SetStatus(ImTextureStatus.Destroyed);
-        }
+        SDL.SubmitGPUCommandBuffer(commandBuffer);
     }
 
-    private unsafe void UpdateBuffers(ImDrawDataPtr drawData)
+    public void Dispose()
     {
-        if (drawData.TotalVtxCount == 0)
-        {
-            return;
-        }
-
-        // Expand buffers if we need more room
-        if (drawData.TotalVtxCount > _vertexBufferSize)
-        {
-            _vertexBuffer?.Dispose();
-
-            _vertexBufferSize = (int)(drawData.TotalVtxCount * 1.5f);
-            _vertexBuffer = new VertexBuffer
-                (_graphicsDevice, DrawVertDeclaration.Declaration, _vertexBufferSize, BufferUsage.None);
-            _vertexData = new byte[_vertexBufferSize * DrawVertDeclaration.Size];
-        }
-
-        if (drawData.TotalIdxCount > _indexBufferSize)
-        {
-            _indexBuffer?.Dispose();
-
-            _indexBufferSize = (int)(drawData.TotalIdxCount * 1.5f);
-            _indexBuffer = new IndexBuffer
-                (_graphicsDevice, IndexElementSize.SixteenBits, _indexBufferSize, BufferUsage.None);
-            _indexData = new byte[_indexBufferSize * sizeof(ushort)];
-        }
-
-        // Copy ImGui's vertices and indices to a set of managed byte arrays
-        int vtxOffset = 0;
-        int idxOffset = 0;
-
-        for (int n = 0; n < drawData.CmdListsCount; n++)
-        {
-            ImDrawListPtr cmdList = drawData.CmdLists[n];
-
-            fixed (void* vtxDstPtr = &_vertexData[vtxOffset * DrawVertDeclaration.Size])
-            fixed (void* idxDstPtr = &_indexData[idxOffset * sizeof(ushort)])
-            {
-                Buffer.MemoryCopy
-                (
-                    (void*)cmdList.VtxBuffer.Data,
-                    vtxDstPtr,
-                    _vertexData.Length,
-                    cmdList.VtxBuffer.Size * DrawVertDeclaration.Size
-                );
-                Buffer.MemoryCopy
-                (
-                    (void*)cmdList.IdxBuffer.Data,
-                    idxDstPtr,
-                    _indexData.Length,
-                    cmdList.IdxBuffer.Size * sizeof(ushort)
-                );
-            }
-
-            vtxOffset += cmdList.VtxBuffer.Size;
-            idxOffset += cmdList.IdxBuffer.Size;
-        }
-
-        // Copy the managed byte arrays to the gpu vertex- and index buffers
-        fixed (byte* p = &_vertexData[0])
-        {
-            _vertexBuffer.SetDataPointerEXT(0, (IntPtr)p, drawData.TotalVtxCount * DrawVertDeclaration.Size, SetDataOptions.Discard);
-        }
-                
-        fixed (byte* p = &_indexData[0])
-        {
-            _indexBuffer.SetDataPointerEXT(0, (IntPtr)p, drawData.TotalIdxCount * sizeof(ushort), SetDataOptions.Discard);
-        }
-    }
-
-    private unsafe void RenderCommandLists(ImDrawDataPtr drawData)
-    {
-        if (drawData.DisplaySize.X == 0 || drawData.DisplaySize.Y == 0)
-        {
-            return;
-        } 
-        _graphicsDevice.SetVertexBuffer(_vertexBuffer);
-        _graphicsDevice.Indices = _indexBuffer;
-
-        int vtxOffset = 0;
-        int idxOffset = 0;
-
-        for (int n = 0; n < drawData.CmdListsCount; n++)
-        {
-            ImDrawListPtr cmdList = drawData.CmdLists[n];
-
-            for (int cmdi = 0; cmdi < cmdList.CmdBuffer.Size; cmdi++)
-            {
-                ImDrawCmd drawCmd = cmdList.CmdBuffer[cmdi];
-
-                if (drawCmd.ElemCount == 0)
-                {
-                    continue;
-                }
-
-                var textureIdx = (int)drawCmd.GetTexID();
-
-                _graphicsDevice.ScissorRectangle = new Rectangle
-                (
-                    (int)(drawCmd.ClipRect.X - drawData.DisplayPos.X),
-                    (int)(drawCmd.ClipRect.Y - drawData.DisplayPos.Y),
-                    (int)(drawCmd.ClipRect.Z - drawCmd.ClipRect.X),
-                    (int)(drawCmd.ClipRect.W - drawCmd.ClipRect.Y)
-                );
-
-                var effect = UpdateEffect(_LoadedTextures[textureIdx], drawData);
-
-                foreach (var pass in effect.CurrentTechnique.Passes)
-                {
-                    pass.Apply();
-
-                    _graphicsDevice.DrawIndexedPrimitives
-                    (
-                        PrimitiveType.TriangleList,
-                        (int)drawCmd.VtxOffset + vtxOffset,
-                        0,
-                        cmdList.VtxBuffer.Size,
-                        (int)drawCmd.IdxOffset + idxOffset,
-                        (int)drawCmd.ElemCount / 3
-                    );
-                }
-            }
-
-            vtxOffset += cmdList.VtxBuffer.Size;
-            idxOffset += cmdList.IdxBuffer.Size;
-        }
     }
 }
