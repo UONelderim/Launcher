@@ -66,6 +66,7 @@ public class ImGuiRenderer : IDisposable
         style.FontScaleDpi = mainScale;
         io.ConfigDpiScaleFonts = true;
         io.ConfigDpiScaleViewports = true;
+        io.IniFilename = (byte*)IntPtr.Zero;
 
         if ((io.ConfigFlags & ImGuiConfigFlags.ViewportsEnable) != 0)
         {
