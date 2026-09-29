@@ -1,12 +1,9 @@
 ﻿using System.Diagnostics;
-using System.Drawing;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Nelderim.Utility;
 using Num = System.Numerics;
 using Hexa.NET.ImGui;
-
-using System.Numerics;
 
 namespace Nelderim.Launcher
 {
@@ -18,14 +15,6 @@ namespace Nelderim.Launcher
         
         private ImGuiRenderer _ImGuiRenderer;
         
-        Dictionary<string, Texture2D> _LoadedTextures = new();
-        private IntPtr _BackgroundTexture;
-        private IntPtr _LaunchTexture;
-        private IntPtr _WebsiteTexture;
-        private IntPtr _DiscordTexture;
-        private IntPtr _PatreonTexture;
-        private IntPtr _LogoTexture;
-
         private bool _UpdateAvailable;
 
         private Manifest _LocalManifest;
@@ -67,49 +56,25 @@ namespace Nelderim.Launcher
             // _autoUpdateInfos = FetchAutoUpdateInfo();
             // _updateAvailable = IsUpdateAvailable();
             
-            LoadContent();
-        }
-        
-        private void LoadContent()
-        {
             _ImGuiRenderer.LoadFontResource("Footlight-mt-light.ttf", 24);
-            _BackgroundTexture = BindImage("background");
-            _LaunchTexture = BindImage("launch");
-            _WebsiteTexture = BindImage("www");
-            _DiscordTexture = BindImage("discord");
-            _PatreonTexture = BindImage("patreon");
-            _LogoTexture = BindImage("logo");
         }
-        
+
+        public TextureData GetTexture(string name)
+        {
+            return _ImGuiRenderer.GetTexture(name);
+        }
+            
         private static string CurrentPlatform =>
             OperatingSystem.IsWindows() ? "win" : OperatingSystem.IsMacOS() ? "osx" : "linux";
-        
-        private ImTextureID BindImage(string fileName)
-        {
-            var png = $"{fileName}.png";
-            Stream fileStream;
-            if (File.Exists(png))
-            {
-                fileStream = File.OpenRead(png);
-            }
-            else
-            {
-                fileStream = GetType().Assembly.GetManifestResourceStream($"NelderimLauncher.Resources.{png}");
-            }
-            
-            var texture = Texture2D.FromStream(_gdm.GraphicsDevice, fileStream);
-            _LoadedTextures[fileName] = texture;
-            return _ImGuiRenderer.BindTexture(texture);
-        }
         
         public void Run()
         {
             bool done = false;
             while (!done)
             {
-                if (_ImGuiRenderer.BeforeDraw(out done))
+                if (_ImGuiRenderer.BeforeDraw(ref done))
                 {
-                    DrawUI();
+                    DrawUI(ref done);
                 }
                 _ImGuiRenderer.AfterDraw();
             }
@@ -130,7 +95,7 @@ namespace Nelderim.Launcher
         private float _DownloadProgressValue;
         private string PatchUrl => Config.Instance.PatchUrl;
 
-        private void DrawUI()
+        private void DrawUI(ref bool done)
         {
             var viewport = ImGui.GetMainViewport();
             ImGui.SetNextWindowPos(viewport.WorkPos);
@@ -152,7 +117,7 @@ namespace Nelderim.Launcher
                 }
                 else
                 {
-                    DrawMainUI();
+                    DrawMainUI(ref done);
                 }
                 ImGui.End();
             }
@@ -177,7 +142,7 @@ namespace Nelderim.Launcher
 
         public Num.Vector4 NelderimTint = new(0.8f, 0.4f, 0.4f, 0.75f);
         
-        private unsafe void DrawMainUI()
+        private unsafe void DrawMainUI(ref bool done)
         {
             var viewport = ImGui.GetMainViewport();
             var minPos = ImGui.GetCursorStartPos();
@@ -188,16 +153,16 @@ namespace Nelderim.Launcher
             
             //Background
             ImGui.PushClipRect(Num.Vector2.Zero, viewport.WorkSize, false);
-            ImGui.GetWindowDrawList().AddImage(new ImTextureRef(null, _BackgroundTexture), Num.Vector2.Zero, viewport.WorkSize);
+            ImGui.GetWindowDrawList().AddImage(new ImTextureRef(null, GetTexture("background").Id), Num.Vector2.Zero, viewport.WorkSize);
             ImGui.PopClipRect();
             
             //Logo
-            var imageSize = new Num.Vector2(_LoadedTextures["logo"].Bounds.Width, _LoadedTextures["logo"].Bounds.Height) * 0.9f;
+            var imageSize = new Num.Vector2(GetTexture("logo").Width, GetTexture("logo").Height) * 0.9f;
             var imagePos = new Num.Vector2(100, 20);
             ImGui.SetCursorPos(imagePos + new Num.Vector2(-3, 1));
-            ImGui.ImageWithBg(new ImTextureRef(null,_LogoTexture), imageSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(0,0,0,1)); //Outline
+            ImGui.ImageWithBg(new ImTextureRef(null, GetTexture("logo").Id), imageSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(0,0,0,1)); //Outline
             ImGui.SetCursorPos(imagePos);
-            ImGui.ImageWithBg(new ImTextureRef(null,_LogoTexture), imageSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, NelderimTint); //Logo
+            ImGui.ImageWithBg(new ImTextureRef(null, GetTexture("logo").Id), imageSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, NelderimTint); //Logo
             
             //TopButtons
             var smallButtonSize = new Num.Vector2(37, 37);
@@ -205,17 +170,17 @@ namespace Nelderim.Launcher
             ImGui.SetCursorPos(smallButtonsStartPos);
             ImGui.PushStyleColor(ImGuiCol.Button, new Num.Vector4(0.1f, 0.1f, 0.1f, 0.7f));
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Num.Vector4(0.2f, 0.2f, 0.2f, 0.7f));
-            if(ImGui.ImageButton("WWW", new ImTextureRef(null,_WebsiteTexture), smallButtonSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(1,1,1,0.8f)))
+            if(ImGui.ImageButton("WWW", new ImTextureRef(null, GetTexture("www").Id), smallButtonSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(1,1,1,0.8f)))
             {
                 Browser.Open("https://www.nelderim.pl");
             }
             ImGui.SameLine();
-            if (ImGui.ImageButton("Discord", new ImTextureRef(null,_DiscordTexture), smallButtonSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(1,1,1,0.8f)))
+            if (ImGui.ImageButton("Discord", new ImTextureRef(null, GetTexture("discord").Id), smallButtonSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(1,1,1,0.8f)))
             {
                 Browser.Open("https://discord.gg/GDyGncD");
             }
             ImGui.SameLine();
-            if (ImGui.ImageButton("Patreon", new ImTextureRef(null,_PatreonTexture), smallButtonSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(1,1,1,0.8f)))
+            if (ImGui.ImageButton("Patreon", new ImTextureRef(null, GetTexture("patreon").Id), smallButtonSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, new Num.Vector4(1,1,1,0.8f)))
             {
                 Browser.Open("https://www.patreon.com/nelderim");
             }
@@ -251,9 +216,9 @@ namespace Nelderim.Launcher
             
             //Run button
             ImGui.PushClipRect(Num.Vector2.Zero, viewport.WorkSize, false);
-            var wScale = ImGuiRenderer.WindowWidth / (float)_LoadedTextures["background"].Width;
-            var hScale = ImGuiRenderer.WindowHeight / (float)_LoadedTextures["background"].Height;
-            var launchSize = new Num.Vector2(_LoadedTextures["launch"].Width * wScale, _LoadedTextures["launch"].Height * hScale);
+            var wScale = ImGuiRenderer.WindowWidth / (float)GetTexture("background").Width;
+            var hScale = ImGuiRenderer.WindowHeight / (float)GetTexture("background").Height;
+            var launchSize = new Num.Vector2(GetTexture("launch").Width * wScale, GetTexture("launch").Height * hScale);
             var launchPos = new Num.Vector2((int)(viewport.WorkSize.X  - launchSize.X - 1), (int)(viewport.WorkSize.Y - launchSize.Y - 1));
             ImGui.SetCursorPos(launchPos);
             ImGui.Dummy(launchSize);
@@ -265,7 +230,7 @@ namespace Nelderim.Launcher
             var canRun = !_Updating && !string.IsNullOrEmpty(entryPoint) && File.Exists(entryPoint);
             var launchTint = canRun && ImGui.IsItemHovered() ? Num.Vector4.One : new Num.Vector4(0.6f, 0.6f, 0.6f, 1);
             ImGui.BeginDisabled(!canRun);
-            if (ImGui.ImageButton("Uruchom", new ImTextureRef(null,_LaunchTexture), launchSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, launchTint))
+            if (ImGui.ImageButton("Uruchom", new ImTextureRef(null, GetTexture("launch").Id), launchSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, launchTint))
             {
                 SetExecutable(entryPoint);
                 var startInfo = new ProcessStartInfo();
@@ -284,7 +249,7 @@ namespace Nelderim.Launcher
                 }
                 startInfo.WorkingDirectory = Path.GetDirectoryName(entryPoint);
                 Process.Start(startInfo)?.WaitForExit(); //Wait for shell exit, game stays open
-                Exit();
+                done = true;
             }
             ImGui.EndDisabled();
             ImGui.PopStyleColor(3);

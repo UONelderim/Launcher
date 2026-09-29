@@ -12,7 +12,8 @@ public class ImGuiRenderer : IDisposable
     private SDLWindowPtr _Window;
     private SDLGPUDevicePtr _GpuDevice;
 
-    private Texture2D[] _LoadedTextures;
+    private readonly Dictionary< string, TextureData> _Textures = [];
+    private List<nint> _TextureHandles = [];
 
     public unsafe ImGuiRenderer(string version)
     {
@@ -51,15 +52,13 @@ public class ImGuiRenderer : IDisposable
         }
 
         SDL.SetGPUSwapchainParameters(_GpuDevice, _Window,
-            SDLGPUSwapchainComposition.Sdr, SDLGPUPresentMode.Mailbox);
+            SDLGPUSwapchainComposition.Sdr, SDLGPUPresentMode.Vsync);
 
         var ctx = ImGui.CreateContext();
         ImGui.SetCurrentContext(ctx);
         ImGuiIOPtr io = ImGui.GetIO();
         io.ConfigFlags |= ImGuiConfigFlags.NavEnableKeyboard
-                          | ImGuiConfigFlags.NavEnableGamepad
-                          | ImGuiConfigFlags.DockingEnable
-                          | ImGuiConfigFlags.ViewportsEnable;
+                          | ImGuiConfigFlags.NavEnableGamepad;
 
         ImGui.StyleColorsDark();
         var style = ImGui.GetStyle();
@@ -100,41 +99,116 @@ public class ImGuiRenderer : IDisposable
         ImGui.PushFont(fontPtr, fontSize);
     }
 
-    public virtual ImTextureID BindTexture(Texture2D texture)
+    public TextureData GetTexture(string name)
     {
-        var id = Array.IndexOf(_LoadedTextures, texture);
-        if (id == -1)
+        if (_Textures.TryGetValue(name, out var texData))
         {
-            //Zero index is null ImTextureID, so we just keep this one empty.
-            for (var i = 1; i < _LoadedTextures.Length; i++)
-            {
-                if (_LoadedTextures[i] == null)
-                {
-                    _LoadedTextures[i] = texture;
-                    id = i;
-                    break;
-                }
-            }
-
-            if (id == -1)
-            {
-                id = _LoadedTextures.Length;
-                Array.Resize(ref _LoadedTextures, _LoadedTextures.Length * 2);
-                _LoadedTextures[id] = texture;
-            }
+            return texData;
+        }
+        
+        var png = $"{name}.png";
+        Stream fileStream;
+        if (File.Exists(png))
+        {
+            fileStream = File.OpenRead(png);
+        }
+        else
+        {
+            fileStream = GetType().Assembly.GetManifestResourceStream($"NelderimLauncher.Resources.{png}");
         }
 
-        return new ImTextureID(id);
+        if (fileStream == null)
+        {
+            Console.WriteLine($"Unable to find resource for {name}");
+        }
+            
+        using (fileStream)
+        {
+            var texture = LoadTexture(fileStream);
+            _Textures[name] = texture;
+            return texture;
+        }
     }
 
-    public virtual void UnbindTexture(ImTextureID textureId)
+    public unsafe TextureData LoadTexture(Stream stream)
     {
-        _LoadedTextures[(int)textureId.Handle] = null;
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        var data = ms.GetBuffer();
+
+        SDLSurface* loaded;
+        fixed (byte* ptr = data)
+        {
+            var io = SDL.IOFromConstMem(ptr, (nuint)ms.Length);
+            loaded = SDL.LoadPNGIO(io, true);
+        }
+        if (loaded == null)
+            throw new InvalidOperationException($"SDL_LoadPNG_IO(): {SDL.GetErrorS()}");
+
+        //RGBA byte order to match R8G8B8A8Unorm
+        SDLSurface* surface = SDL.ConvertSurface(loaded, SDLPixelFormat.Abgr8888);
+        SDL.DestroySurface(loaded);
+        if (surface == null)
+            throw new InvalidOperationException($"SDL_ConvertSurface(): {SDL.GetErrorS()}");
+
+        var width = surface->W;
+        var height = surface->H;
+        var rowSize = width * 4;
+
+        var textureInfo = new SDLGPUTextureCreateInfo
+        {
+            Type = SDLGPUTextureType.Texturetype2D,
+            Format = SDLGPUTextureFormat.R8G8B8A8Unorm,
+            Usage = (uint)SDLGPUTextureUsageFlags.Sampler,
+            Width = (uint)width,
+            Height = (uint)height,
+            LayerCountOrDepth = 1,
+            NumLevels = 1,
+        };
+        SDLGPUTexture* gpuTexture = SDL.CreateGPUTexture(_GpuDevice, &textureInfo);
+        if (gpuTexture == null)
+        {
+            SDL.DestroySurface(surface);
+            throw new InvalidOperationException($"SDL_CreateGPUTexture(): {SDL.GetErrorS()}");
+        }
+
+        var transferInfo = new SDLGPUTransferBufferCreateInfo
+        {
+            Usage = SDLGPUTransferBufferUsage.Upload,
+            Size = (uint)(rowSize * height),
+        };
+        var transferBuffer = SDL.CreateGPUTransferBuffer(_GpuDevice, &transferInfo);
+        var dst = (byte*)SDL.MapGPUTransferBuffer(_GpuDevice, transferBuffer, false);
+        var src = (byte*)surface->Pixels;
+        for (var y = 0; y < height; y++)
+        {
+            Buffer.MemoryCopy(src + y * surface->Pitch, dst + y * rowSize, rowSize, rowSize);
+        }
+        SDL.UnmapGPUTransferBuffer(_GpuDevice, transferBuffer);
+        SDL.DestroySurface(surface);
+
+        var commandBuffer = SDL.AcquireGPUCommandBuffer(_GpuDevice);
+        var copyPass = SDL.BeginGPUCopyPass(commandBuffer);
+        var source = new SDLGPUTextureTransferInfo { TransferBuffer = transferBuffer };
+        var destination = new SDLGPUTextureRegion
+        {
+            Texture = gpuTexture,
+            W = (uint)width,
+            H = (uint)height,
+            D = 1,
+        };
+        SDL.UploadToGPUTexture(copyPass, &source, &destination, false);
+        SDL.EndGPUCopyPass(copyPass);
+        SDL.SubmitGPUCommandBuffer(commandBuffer);
+        SDL.ReleaseGPUTransferBuffer(_GpuDevice, transferBuffer);
+
+        _TextureHandles.Add((nint)gpuTexture);
+        //SDLGPU3 backend expects SDL_GPUTexture* as ImTextureID
+        return new TextureData(new ImTextureID(gpuTexture), width, height);
     }
 
-    public unsafe bool BeforeDraw(out bool done)
+    public unsafe bool BeforeDraw(ref bool done)
     {
-        done = false;
         SDLEvent e;
         while (SDL.PollEvent(&e))
         {
@@ -191,18 +265,17 @@ public class ImGuiRenderer : IDisposable
                 (SDLBackend.SDLGPURenderPass*)renderPass, null);
             SDL.EndGPURenderPass(renderPass);
         }
-
-        //No need for viewports
-        // if ((io.ConfigFlags & ImGuiConfigFlags.ViewportsEnable) != 0)
-        // {
-        //     ImGui.UpdatePlatformWindows();
-        //     ImGui.RenderPlatformWindowsDefault();
-        // }
-
+        
         SDL.SubmitGPUCommandBuffer(commandBuffer);
     }
 
-    public void Dispose()
+    public unsafe void Dispose()
     {
+        SDL.WaitForGPUIdle(_GpuDevice);
+        foreach (var texture in _TextureHandles)
+            SDL.ReleaseGPUTexture(_GpuDevice, (SDLGPUTexture*)texture);
+        _Textures.Clear();
     }
 }
+
+public readonly record struct TextureData(ImTextureID Id, int Width, int Height);
