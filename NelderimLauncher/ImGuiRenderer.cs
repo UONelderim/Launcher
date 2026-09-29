@@ -6,8 +6,16 @@ namespace Nelderim.Launcher;
 
 public class ImGuiRenderer : IDisposable
 {
-    public const int WindowWidth = 1280;
-    public const int WindowHeight = 720;
+    
+    public int WindowWidth
+    {
+        get;
+        private set;
+    }
+    public int WindowHeight
+    {
+        get; private set;
+    }
     
     private SDLWindowPtr _Window;
     private SDLGPUDevicePtr _GpuDevice;
@@ -32,6 +40,11 @@ public class ImGuiRenderer : IDisposable
             Console.WriteLine($"Error: SDL_CreateWindow(): {SDL.GetErrorS()}");
             return;
         }
+
+        int w = 0, h = 0;
+        SDL.GetWindowSizeInPixels(_Window,  ref w, ref h);
+        WindowWidth = w;
+        WindowHeight = h;
 
         SDL.SetWindowPosition(_Window, (int)SDL.SDL_WINDOWPOS_CENTERED_MASK, (int)SDL.SDL_WINDOWPOS_CENTERED_MASK);
         SDL.ShowWindow(_Window);

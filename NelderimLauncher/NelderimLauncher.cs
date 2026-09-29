@@ -216,8 +216,8 @@ namespace Nelderim.Launcher
             
             //Run button
             ImGui.PushClipRect(Num.Vector2.Zero, viewport.WorkSize, false);
-            var wScale = ImGuiRenderer.WindowWidth / (float)GetTexture("background").Width;
-            var hScale = ImGuiRenderer.WindowHeight / (float)GetTexture("background").Height;
+            var wScale = _ImGuiRenderer.WindowWidth / (float)GetTexture("background").Width;
+            var hScale = _ImGuiRenderer.WindowHeight / (float)GetTexture("background").Height;
             var launchSize = new Num.Vector2(GetTexture("launch").Width * wScale, GetTexture("launch").Height * hScale);
             var launchPos = new Num.Vector2((int)(viewport.WorkSize.X  - launchSize.X - 1), (int)(viewport.WorkSize.Y - launchSize.Y - 1));
             ImGui.SetCursorPos(launchPos);
