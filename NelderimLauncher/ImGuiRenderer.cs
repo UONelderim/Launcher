@@ -34,7 +34,7 @@ public class ImGuiRenderer : IDisposable
         float mainScale = SDL.GetDisplayContentScale(SDL.GetPrimaryDisplay());
         var windowFlags = (uint)(SDLWindowFlags.Hidden | SDLWindowFlags.HighPixelDensity);
         _Window = SDL.CreateWindow($"Nelderim Launcher {version}",
-            (int)(WindowWidth * mainScale), (int)(WindowHeight * mainScale), windowFlags);
+            (int)(1280 * mainScale), (int)(720 * mainScale), windowFlags);
         if (_Window.IsNull)
         {
             Console.WriteLine($"Error: SDL_CreateWindow(): {SDL.GetErrorS()}");

@@ -7,11 +7,17 @@ public class Program
 {
     // Server layout: common client assets and ClassicUO package per platform (see scripts/build_package.py)
     private const string CommonPath = "Nelderim";
-    private static readonly Dictionary<string, (string Path, string EntryPoint)> PlatformSections = new()
+    private static readonly Dictionary<Platform, (string Path, string EntryPoint)> PlatformSections = new()
     {
-        ["win"] = ("dist/win", "ClassicUO/ClassicUO.exe"),
-        ["linux"] = ("dist/linux", "ClassicUO/ClassicUO"),
-        ["osx"] = ("dist/osx", "ClassicUO/ClassicUO"),
+        [Platform.win] = ("dist/win", "ClassicUO/ClassicUO.exe"),
+        [Platform.linux] = ("dist/linux", "ClassicUO/ClassicUO"),
+        [Platform.osx] = ("dist/osx", "ClassicUO/ClassicUO"),
+    };
+    private static readonly Dictionary<Platform, string> LauncherPaths = new()
+    {
+        [Platform.win] = "launcher/win/NelderimLauncher.exe",
+        [Platform.linux] = "launcher/linux/NelderimLauncher",
+        [Platform.osx] = "launcher/osx/NelderimLauncher",
     };
 
     public static void Main(string[] args)
@@ -37,23 +43,27 @@ public class Program
         }
 
         var common = ProcessSection(CommonPath, "", currentManifest.Common, excludes, mergeFiles, false);
-        var platforms = new Dictionary<string, ManifestSection>();
+        var platforms = new Dictionary<Platform, ManifestSection>();
         foreach (var (platform, (path, entryPoint)) in PlatformSections)
         {
             currentManifest.Platforms.TryGetValue(platform, out var prevSection);
-            var section = ProcessSection(path, entryPoint, prevSection, excludes, mergeFiles, platform != "win");
+            var section = ProcessSection(path, entryPoint, prevSection, excludes, mergeFiles, platform != Platform.win);
             if (section != null)
                 platforms[platform] = section;
         }
 
-        FileInfo? launcherInfo = null;
-        var launcherPath = "NelderimLauncher.exe";
-        if (File.Exists(launcherPath))
+        var launchers = new Dictionary<Platform, FileInfo>();
+        foreach (var (platform, path) in LauncherPaths)
         {
-            launcherInfo = ProcessFile(launcherPath, launcherPath, currentManifest.Launcher);
+            if (!File.Exists(path))
+            {
+                Console.WriteLine($"Warning: {path} not found, skipping");
+                continue;
+            }
+            launchers[platform] = ProcessFile(path, path, currentManifest.LauncherFor(platform));
         }
 
-        var newManifest = new Manifest(currentManifest.Version + 1, launcherInfo, common, platforms);
+        var newManifest = new Manifest(currentManifest.Version + 1, launchers, common, platforms);
 
         using var newManifestStream = File.Create(manifestPath);
         JsonSerializer.Serialize(newManifestStream, newManifest, ManifestJsonContext.Default.Manifest);

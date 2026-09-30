@@ -2,22 +2,34 @@
 
 namespace Nelderim;
 
-public class Manifest(int version, FileInfo? launcher, ManifestSection? common, Dictionary<string, ManifestSection>? platforms)
+public enum Platform
+{
+    win,
+    linux,
+    osx
+}
+
+public class Manifest(int version, Dictionary<Platform, FileInfo>? launchers, ManifestSection? common, Dictionary<Platform, ManifestSection>? platforms)
 {
     public int Version { get; } = version;
-    public FileInfo? Launcher { get; } = launcher;
+    public Dictionary<Platform, FileInfo> Launchers { get; } = launchers ?? new();
     public ManifestSection Common { get; } = common ?? new ManifestSection("", "", []);
-    public Dictionary<string, ManifestSection> Platforms { get; } = platforms ?? new();
+    public Dictionary<Platform, ManifestSection> Platforms { get; } = platforms ?? new();
 
     public static Manifest Empty => new(0, null, null, null);
-    
-    public string EntryPointFor(string platform)
+
+    public FileInfo? LauncherFor(Platform platform)
+    {
+        return Launchers.GetValueOrDefault(platform);
+    }
+
+    public string EntryPointFor(Platform platform)
     {
         return Platforms.TryGetValue(platform, out var section) ? section.EntryPoint : "";
     }
 
     // Common files + platform files, platform entry wins on duplicate local path
-    public List<FileInfo> FilesFor(string platform)
+    public List<FileInfo> FilesFor(Platform platform)
     {
         var sections = new List<ManifestSection> { Common };
         if (Platforms.TryGetValue(platform, out var platformSection))
@@ -35,7 +47,7 @@ public class Manifest(int version, FileInfo? launcher, ManifestSection? common, 
         return result.Values.ToList();
     }
 
-    public List<FileInfo> ChangesBetween(Manifest otherManifest, string platform)
+    public List<FileInfo> ChangesBetween(Manifest otherManifest, Platform platform)
     {
         if (otherManifest.Version != Version)
         {

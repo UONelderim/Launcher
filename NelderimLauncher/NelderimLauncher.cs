@@ -15,7 +15,10 @@ namespace Nelderim.Launcher
         
         private ImGuiRenderer _ImGuiRenderer;
         
-        private bool _UpdateAvailable;
+        private enum SelfUpdateState { Checking, Updating, Failed, Done }
+        private volatile SelfUpdateState _SelfUpdateState = SelfUpdateState.Checking;
+        private string _SelfUpdateError = "";
+        private volatile bool _Exit;
 
         private Manifest _LocalManifest;
         private List<FileInfo> _ChangedFiles;
@@ -52,10 +55,14 @@ namespace Nelderim.Launcher
             {
                 _LocalManifest = Manifest.Empty;
             }
-            //TODO: Bring me back
-            // _autoUpdateInfos = FetchAutoUpdateInfo();
-            // _updateAvailable = IsUpdateAvailable();
-            
+
+            CleanupOldLauncher();
+#if DEBUG
+            _SelfUpdateState = SelfUpdateState.Done; //Dev build never matches server hash
+#else
+            Task.Run(SelfUpdate);
+#endif
+
             _ImGuiRenderer.LoadFontResource("Footlight-mt-light.ttf", 24);
         }
 
@@ -64,8 +71,8 @@ namespace Nelderim.Launcher
             return _ImGuiRenderer.GetTexture(name);
         }
             
-        private static string CurrentPlatform =>
-            OperatingSystem.IsWindows() ? "win" : OperatingSystem.IsMacOS() ? "osx" : "linux";
+        private static Platform CurrentPlatform =>
+            OperatingSystem.IsWindows() ? Platform.win : OperatingSystem.IsMacOS() ? Platform.osx : Platform.linux;
         
         public void Run()
         {
@@ -77,6 +84,8 @@ namespace Nelderim.Launcher
                     DrawUI(ref done);
                 }
                 _ImGuiRenderer.AfterDraw();
+                if (_Exit)
+                    done = true;
             }
         }
         
@@ -89,7 +98,8 @@ namespace Nelderim.Launcher
         
         private string _LogText = "";
         private string _LastLogMessage = "";
-        private bool _Updating;
+        private volatile bool _Updating;
+        private CancellationTokenSource? _UpdateCancellation;
         private string _DownloadFileName = "";
         private Progress<float> _DownloadProgressHandler;
         private float _DownloadProgressValue;
@@ -103,9 +113,9 @@ namespace Nelderim.Launcher
             if (ImGui.Begin("MainWindow",
                     ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings))
             {
-                if (_UpdateAvailable)
+                if (_SelfUpdateState != SelfUpdateState.Done)
                 {
-                    DrawUpdateUI();
+                    DrawSelfUpdateUI();
                 }
                 else if (_ShowLogs)
                 {
@@ -233,22 +243,7 @@ namespace Nelderim.Launcher
             if (ImGui.ImageButton("Uruchom", new ImTextureRef(null, GetTexture("launch").Id), launchSize, Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.Zero, launchTint))
             {
                 SetExecutable(entryPoint);
-                var startInfo = new ProcessStartInfo();
-                if (OperatingSystem.IsWindows())
-                {
-                    startInfo.FileName = entryPoint;
-                }
-                else
-                {
-                    // Child inherits our stdout/stderr; once we exit, writes to them kill it (SIGPIPE).
-                    // Detach stdio, ignore SIGHUP and background it so it outlives the launcher.
-                    startInfo.FileName = "/bin/sh";
-                    startInfo.ArgumentList.Add("-c");
-                    startInfo.ArgumentList.Add("nohup \"$0\" </dev/null >/dev/null 2>&1 &");
-                    startInfo.ArgumentList.Add(Path.GetFullPath(entryPoint));
-                }
-                startInfo.WorkingDirectory = Path.GetDirectoryName(entryPoint);
-                Process.Start(startInfo)?.WaitForExit(5000); //Wait for shell exit, game stays open
+                StartDetached(entryPoint, Path.GetDirectoryName(entryPoint));
                 done = true;
             }
             ImGui.EndDisabled();
@@ -257,12 +252,17 @@ namespace Nelderim.Launcher
 
             ImGui.SetCursorPosY(maxPos.Y * 0.8f);
             ImGui.SetCursorPosX(maxPos.X * 0.35f);
-            ImGui.BeginDisabled(_Updating);
-            if (ImGui.Button("Aktualizuj"))
+            if (_Updating)
             {
-                Task.Run(Update);
+                if (ImGui.Button("Anuluj"))
+                {
+                    _UpdateCancellation?.Cancel();
+                }
             }
-            ImGui.EndDisabled();
+            else if (ImGui.Button("Aktualizuj"))
+            {
+                StartUpdateTask(Update);
+            }
             
             //Status text
             ImGui.SetCursorPosY(maxPos.Y * 0.85f);
@@ -320,18 +320,20 @@ namespace Nelderim.Launcher
             BackButton();
             ImGui.NewLine();
             var spaceAvail = ImGui.GetContentRegionAvail();
-            ImGui.BeginDisabled(_Updating);
-            var updateText = "Aktualizuj";
+            var updateText = _Updating ? "Anuluj" : "Aktualizuj";
             var updateTextSize = ImGui.CalcTextSize(updateText);
             var updateButtonSize = new Num.Vector2(updateTextSize.X + ImGui.GetStyle().WindowPadding.X, 36);
             ImGui.SetCursorPosX(spaceAvail.X - updateButtonSize.X);
             if (ImGui.Button(updateText, new Num.Vector2(0, 36)))
             {
                 _ShowOptions = false;
-                Task.Run(Update);
-                
+                if (_Updating)
+                    _UpdateCancellation?.Cancel();
+                else
+                    StartUpdateTask(Update);
             }
             ImGui.Spacing();
+            ImGui.BeginDisabled(_Updating);
             var verifyText = "Weryfikuj instalacje";
             var verifyTextSize = ImGui.CalcTextSize(verifyText);
             var verifyButtonSize = new Num.Vector2(verifyTextSize.X + ImGui.GetStyle().WindowPadding.X, 36);
@@ -339,8 +341,7 @@ namespace Nelderim.Launcher
             if (ImGui.Button(verifyText, new Num.Vector2(0, 36)))
             {
                 _ShowOptions = false;
-                Task.Run(Verify);
-                
+                StartUpdateTask(Verify);
             }
             ImGui.EndDisabled();
             ImGui.Spacing();
@@ -372,72 +373,92 @@ namespace Nelderim.Launcher
             }
         }
 
-        private void DrawUpdateUI()
+        private void DrawSelfUpdateUI()
         {
-            ImGui.Text("Dostepna aktualizacja Nelderim Launcher");
-            ImGui.Text($"Obecna wersja: {Version}");
-            ImGui.Text("Nowa wersja: TODO");
-            if (ImGui.Button("Aktualizuj"))
+            switch (_SelfUpdateState)
             {
-                AutoUpdate();
-            }
-            if (ImGui.Button("Pomin"))
-            {
-                _UpdateAvailable = false;
+                case SelfUpdateState.Checking:
+                    ImGui.Text("Sprawdzam aktualizacje...");
+                    break;
+                case SelfUpdateState.Updating:
+                    ImGui.Text("Aktualizuje Nelderim Launcher");
+                    ImGui.ProgressBar(_DownloadProgressValue, new Num.Vector2(ImGui.GetContentRegionAvail().X, 0), $"{_DownloadProgressValue * 100f:F0}%");
+                    break;
+                case SelfUpdateState.Failed:
+                    ImGui.Text("Aktualizacja Nelderim Launcher nie powiodla sie");
+                    ImGui.TextWrapped(_SelfUpdateError);
+                    if (ImGui.Button("Sprobuj ponownie"))
+                    {
+                        Task.Run(SelfUpdate);
+                    }
+                    break;
             }
         }
 
-        private async Task<Manifest> FetchManifest()
+        private async Task<Manifest> FetchManifest(CancellationToken cancellationToken = default)
         {
-            var response = await _HttpClient.GetAsync($"{PatchUrl}/Nelderim.manifest.json");
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _HttpClient.GetAsync($"{PatchUrl}/Nelderim.manifest.json", cancellationToken);
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
             return JsonSerializer.Deserialize(responseBody, ManifestJsonContext.Default.Manifest);
         }
 
-        private async void Update()
+        // Called from UI, _Updating is set before the task starts so it can't be started twice
+        private void StartUpdateTask(Func<CancellationToken, Task> task)
         {
-            try
-            {
-                var serverManifest = await FetchManifest();
-                _ChangedFiles = _LocalManifest.ChangesBetween(serverManifest, CurrentPlatform);
-                if (await UpdateFiles(_ChangedFiles))
-                    SaveManifest(serverManifest);
-            }
-            catch (Exception e)
-            {
-                Log(e.ToString());
-            }
-        }
-        
-        private async void Verify()
-        {
-            try
-            {
-                var serverManifest = await FetchManifest();
-                if (await UpdateFiles(serverManifest.FilesFor(CurrentPlatform)))
-                    SaveManifest(serverManifest);
-            }
-            catch (Exception e)
-            {
-                Log(e.ToString());
-            }
-        }
-        
-        private async Task<bool> UpdateFiles(List<FileInfo> files)
-        {
+            var cancellation = new CancellationTokenSource();
+            _UpdateCancellation = cancellation;
             _Updating = true;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await task(cancellation.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    Log("Aktualizacja anulowana");
+                }
+                catch (Exception e)
+                {
+                    Log(e.ToString());
+                }
+                finally
+                {
+                    _Updating = false;
+                }
+            });
+        }
+
+        private async Task Update(CancellationToken cancellationToken)
+        {
+            var serverManifest = await FetchManifest(cancellationToken);
+            _ChangedFiles = _LocalManifest.ChangesBetween(serverManifest, CurrentPlatform);
+            if (await UpdateFiles(_ChangedFiles, cancellationToken))
+                SaveManifest(serverManifest);
+        }
+        
+        private async Task Verify(CancellationToken cancellationToken)
+        {
+            var serverManifest = await FetchManifest(cancellationToken);
+            if (await UpdateFiles(serverManifest.FilesFor(CurrentPlatform), cancellationToken))
+                SaveManifest(serverManifest);
+        }
+        
+        private async Task<bool> UpdateFiles(List<FileInfo> files, CancellationToken cancellationToken)
+        {
             try
             {
                 if(files.Count > 0)
                 {
                     foreach (var fileInfo in files)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (fileInfo.Version != -1)
                         {
                             if (fileInfo.MergeKeys != null && File.Exists(fileInfo.File))
                             {
                                 Log($"Aktualizuje {fileInfo.File}");
-                                await MergeJsonFile(fileInfo);
+                                await MergeJsonFile(fileInfo, cancellationToken);
                                 continue;
                             }
                             if (File.Exists(fileInfo.File))
@@ -457,12 +478,19 @@ namespace Nelderim.Launcher
                             
                             Log($"Pobieram {fileInfo.File}");
                             _DownloadFileName = fileInfo.File;
-                            await using (var file = new FileStream(Path.GetFullPath(fileInfo.File), FileMode.Create))
+                            try
                             {
+                                await using var file = new FileStream(Path.GetFullPath(fileInfo.File), FileMode.Create);
                                 await _HttpClient.DownloadDataAsync(
                                     $"{PatchUrl}/{fileInfo.Source}/{fileInfo.File}",
                                     file,
-                                    _DownloadProgressHandler);
+                                    _DownloadProgressHandler,
+                                    cancellationToken);
+                            }
+                            catch
+                            {
+                                File.Delete(fileInfo.File); //Don't leave a partial file behind
+                                throw;
                             }
                         }
                         else
@@ -480,23 +508,22 @@ namespace Nelderim.Launcher
                     Log("Wszystkie pliki aktualne");
                 }
             }
-            catch (Exception e)
+            catch (Exception e) when (e is not OperationCanceledException)
             {
                 Log(e.ToString());
                 return false;
             }
             finally
             {
-                _Updating = false;
                 _DownloadProgressValue = 0f;
                 _DownloadFileName = "";
             }
             return true;
         }
 
-        private async Task MergeJsonFile(FileInfo fileInfo)
+        private async Task MergeJsonFile(FileInfo fileInfo, CancellationToken cancellationToken)
         {
-            var serverText = await _HttpClient.GetStringAsync($"{PatchUrl}/{fileInfo.Source}/{fileInfo.File}");
+            var serverText = await _HttpClient.GetStringAsync($"{PatchUrl}/{fileInfo.Source}/{fileInfo.File}", cancellationToken);
             var server = JsonNode.Parse(serverText)!.AsObject();
 
             JsonObject local;
@@ -540,43 +567,121 @@ namespace Nelderim.Launcher
             _LocalManifest = manifest;
         }
         
-        private bool IsUpdateAvailable()
+        private static void StartDetached(string file, string? workingDirectory)
         {
-            // if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return false;
-            // return Utils.Sha1Hash(Environment.ProcessPath ?? "") != _ServerManifest.First().Sha1;
-            return false;
+            var startInfo = new ProcessStartInfo();
+            startInfo.WorkingDirectory = workingDirectory;
+            if (OperatingSystem.IsWindows())
+            {
+                startInfo.FileName = file;
+                Process.Start(startInfo);
+            }
+            else
+            {
+                // Child inherits our stdout/stderr; once we exit, writes to them kill it (SIGPIPE).
+                // Detach stdio, ignore SIGHUP and background it so it outlives the launcher.
+                startInfo.FileName = "/bin/sh";
+                startInfo.ArgumentList.Add("-c");
+                startInfo.ArgumentList.Add("nohup \"$0\" </dev/null >/dev/null 2>&1 &");
+                startInfo.ArgumentList.Add(Path.GetFullPath(file));
+                Process.Start(startInfo)?.WaitForExit(5000); //Wait for shell exit, child stays open
+            }
         }
 
-        private Manifest FetchAutoUpdateInfo()
+        private static void CleanupOldLauncher()
         {
-            // var patchUrl = Config.Instance.PatchUrl;
-            // var patchJson = _HttpClient.GetAsync($"{patchUrl}/NelderimLauncher.manifest.json").Result.Content.ReadAsStream();
-            // return JsonSerializer.Deserialize<List<Patch>>(patchJson);
-            return null;
+            var currentPath = Environment.ProcessPath;
+            if (currentPath == null)
+                return;
+            try
+            {
+                File.Delete(currentPath + ".old");
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                //Previous launcher still exiting, next start will remove it
+            }
         }
-        
-        private async void AutoUpdate()
+
+        private async Task SelfUpdate()
         {
-            // var currentPath = Environment.ProcessPath;
-            // var dir = Path.GetDirectoryName(currentPath);
-            // var filename = Path.GetFileName(currentPath);
-            // var newPath = $"{dir}/_{filename}";
-            // if(File.Exists(newPath))
-            // {
-            //     File.Delete(newPath);
-            // }
-            // await using (var file = new FileStream(newPath, FileMode.OpenOrCreate))
-            // {
-            //     await _HttpClient.DownloadDataAsync($"{PatchUrl}/{_ServerManifest.First().File}",
-            //         file,
-            //         _downloadProgressHandler);
-            // }
-            //
-            // var process = new Process();
-            // process.StartInfo.FileName = Path.GetFullPath(newPath);
-            // process.StartInfo.Arguments = $"autoupdate {filename}";
-            // process.Start();
-            // Exit();
+            _SelfUpdateState = SelfUpdateState.Checking;
+            var currentPath = Environment.ProcessPath;
+            FileInfo? launcherInfo;
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                var serverManifest = await FetchManifest(timeout.Token);
+                launcherInfo = serverManifest.LauncherFor(CurrentPlatform);
+                if (launcherInfo == null || currentPath == null || SameHash(Utils.Sha1Hash(currentPath), launcherInfo.Sha1))
+                {
+                    _SelfUpdateState = SelfUpdateState.Done;
+                    return;
+                }
+            }
+            catch (Exception e)
+            {
+                //Server unreachable, no update known
+                Log(e.ToString());
+                _SelfUpdateState = SelfUpdateState.Done;
+                return;
+            }
+
+            _SelfUpdateState = SelfUpdateState.Updating;
+            var newPath = currentPath + ".new";
+            var oldPath = currentPath + ".old";
+            try
+            {
+                Log("Aktualizuje Nelderim Launcher");
+                await using (var file = new FileStream(newPath, FileMode.Create))
+                {
+                    await _HttpClient.DownloadDataAsync($"{PatchUrl}/{launcherInfo.File}",
+                        file,
+                        _DownloadProgressHandler);
+                }
+                if (!SameHash(Utils.Sha1Hash(newPath), launcherInfo.Sha1))
+                    throw new InvalidDataException("Suma kontrolna pobranego pliku nie zgadza sie");
+                SetExecutable(newPath);
+
+                // Running binary can be renamed on every platform, but not overwritten or deleted on Windows.
+                // Rename also gives a new inode, overwriting a signed binary in place gets it killed on macOS.
+                File.Delete(oldPath);
+                File.Move(currentPath, oldPath);
+                try
+                {
+                    File.Move(newPath, currentPath);
+                }
+                catch
+                {
+                    File.Move(oldPath, currentPath);
+                    throw;
+                }
+
+                StartDetached(currentPath, Environment.CurrentDirectory);
+                _Exit = true;
+            }
+            catch (Exception e)
+            {
+                try
+                {
+                    File.Delete(newPath);
+                }
+                catch (Exception deleteException) when (deleteException is IOException or UnauthorizedAccessException)
+                {
+                }
+                Log(e.ToString());
+                _SelfUpdateError = e.Message;
+                _SelfUpdateState = SelfUpdateState.Failed;
+            }
+            finally
+            {
+                _DownloadProgressValue = 0f;
+            }
+        }
+
+        private static bool SameHash(string a, string b)
+        {
+            return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
         }
 
         
