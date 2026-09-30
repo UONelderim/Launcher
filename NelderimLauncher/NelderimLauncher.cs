@@ -250,19 +250,6 @@ namespace Nelderim.Launcher
             ImGui.PopStyleColor(3);
             ImGui.PopClipRect();
 
-            ImGui.SetCursorPosY(maxPos.Y * 0.8f);
-            ImGui.SetCursorPosX(maxPos.X * 0.35f);
-            if (_Updating)
-            {
-                if (ImGui.Button("Anuluj"))
-                {
-                    _UpdateCancellation?.Cancel();
-                }
-            }
-            else if (ImGui.Button("Aktualizuj"))
-            {
-                StartUpdateTask(Update);
-            }
             
             //Status text
             ImGui.SetCursorPosY(maxPos.Y * 0.85f);
@@ -271,16 +258,16 @@ namespace Nelderim.Launcher
             
             var bottomAvailSize = ImGui.GetContentRegionAvail();
             bottomAvailSize.X *= 0.75f;
-            var textSize = ImGui.CalcTextSize(_LastLogMessage);
-            var textPos = new Num.Vector2(ImGui.GetCursorPosX() + (bottomAvailSize.X - textSize.X) * 0.5f, ImGui.GetCursorPosY());
-            ImGui.SetCursorPos(textPos);
+            var statusTextSize = ImGui.CalcTextSize(_LastLogMessage);
+            var statusTextPos = new Num.Vector2(ImGui.GetCursorPosX() + (bottomAvailSize.X - statusTextSize.X) * 0.5f, ImGui.GetCursorPosY());
+            ImGui.SetCursorPos(statusTextPos);
             if(_LastLogMessage != "")
             {
-                ImGui.GetWindowDrawList().AddRectFilled(textPos - ImGui.GetStyle().FramePadding,
-                    textPos + textSize + ImGui.GetStyle().FramePadding,
+                ImGui.GetWindowDrawList().AddRectFilled(statusTextPos - ImGui.GetStyle().FramePadding,
+                    statusTextPos + statusTextSize + ImGui.GetStyle().FramePadding,
                     ImGui.GetColorU32(new Num.Vector4(0f, 0f, 0f, 0.8f)));
             }
-            ImGui.SetCursorPos(textPos);
+            ImGui.SetCursorPos(statusTextPos);
             ImGui.TextUnformatted(_LastLogMessage);
             
             //Progress bar
@@ -299,6 +286,23 @@ namespace Nelderim.Launcher
             ImGui.SetCursorPosY(progressBarStart.Y + progressBarSize.Y * 0.5f - progressBarTextSize.Y * 0.5f);
             ImGui.TextUnformatted(text);
             ImGui.EndGroup();
+            
+            var updateButtonText = _Updating ? "Anuluj" : "Aktualizuj";
+            var updateButtonTextSize = ImGui.CalcTextSize(updateButtonText);
+            var updateButtonPosX = progressBarStart.X + progressBarSize.X * 0.5f - updateButtonTextSize.X * 0.5f;
+            ImGui.SetCursorPosY(maxPos.Y * 0.8f);
+            ImGui.SetCursorPosX(updateButtonPosX);
+            if (_Updating)
+            {
+                if (ImGui.Button("Anuluj"))
+                {
+                    _UpdateCancellation?.Cancel();
+                }
+            }
+            else if (ImGui.Button("Aktualizuj"))
+            {
+                StartUpdateTask(Update);
+            }
             
             //EndStyle
             ImGui.PopStyleVar();
