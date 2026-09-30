@@ -276,32 +276,41 @@ namespace Nelderim.Launcher
             ImGui.SetCursorPos(progressBarStart);
             ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 5);
             ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1);
-            ImGui.ProgressBar(_DownloadProgressValue, progressBarSize, "");
-            ImGui.PopStyleVar(2);
-            
-            //Progress bar text
-            var text = $"{_DownloadFileName} {_DownloadProgressValue * 100f:F0}%";
-            var progressBarTextSize = ImGui.CalcTextSize(text);
-            ImGui.SetCursorPosX(progressBarStart.X + progressBarSize.X * 0.5f - progressBarTextSize.X * 0.5f);
-            ImGui.SetCursorPosY(progressBarStart.Y + progressBarSize.Y * 0.5f - progressBarTextSize.Y * 0.5f);
-            ImGui.TextUnformatted(text);
-            ImGui.EndGroup();
-            
-            var updateButtonText = _Updating ? "Anuluj" : "Aktualizuj";
-            var updateButtonTextSize = ImGui.CalcTextSize(updateButtonText);
-            var updateButtonPosX = progressBarStart.X + progressBarSize.X * 0.5f - updateButtonTextSize.X * 0.5f;
-            ImGui.SetCursorPosY(maxPos.Y * 0.8f);
-            ImGui.SetCursorPosX(updateButtonPosX);
             if (_Updating)
             {
-                if (ImGui.Button("Anuluj"))
+                ImGui.ProgressBar(_DownloadProgressValue, progressBarSize, "");
+            
+                //Progress bar text
+                var text = _Updating ? $"{_DownloadFileName} {_DownloadProgressValue * 100f:F0}%" : "AKTUALIZUJ";
+                var progressBarTextSize = ImGui.CalcTextSize(text);
+                ImGui.SetCursorPosX(progressBarStart.X + progressBarSize.X * 0.5f - progressBarTextSize.X * 0.5f);
+                ImGui.SetCursorPosY(progressBarStart.Y + progressBarSize.Y * 0.5f - progressBarTextSize.Y * 0.5f);
+                ImGui.TextUnformatted(text);
+            }
+            else
+            {
+                if (ImGui.Button("AKTUALIZUJ", progressBarSize))
+                {
+                    StartUpdateTask(Update);
+                }
+            }
+            ImGui.PopStyleVar(2);
+            ImGui.EndGroup();
+            
+
+            if (_Updating)
+            {
+                var cancelButtonText = "ANULUJ";
+                var cancelButtonTextSize = ImGui.CalcTextSize(cancelButtonText);
+                var cancelButtonPosX = progressBarStart.X + progressBarSize.X * 0.5f - cancelButtonTextSize.X * 0.5f;
+                var cancelButtonSize = cancelButtonTextSize + new Num.Vector2(12, 12);
+                ImGui.SetCursorPosY(maxPos.Y * 0.79f);
+                ImGui.SetCursorPosX(cancelButtonPosX);
+
+                if (ImGui.Button(cancelButtonText, cancelButtonSize))
                 {
                     _UpdateCancellation?.Cancel();
                 }
-            }
-            else if (ImGui.Button("Aktualizuj"))
-            {
-                StartUpdateTask(Update);
             }
             
             //EndStyle
